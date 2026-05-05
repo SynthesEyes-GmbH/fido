@@ -1,0 +1,1 @@
+Placeholder bundle. Real hidden input data is read from /app/data/comp_data on the worker.

@@ -1,0 +1,79 @@
+version: 2
+title: Fusion for Intelligent Decision-support in Ophthalmology (FIDO) Challenge
+description: The FIDO Challenge focuses on multimodal AI-driven decision-support for ophthalmic surgery, combining surgical microscope fundus imaging fand intraoperative OCT (iOCT).
+image: logo.png
+terms: terms.md
+registration_auto_approve: false
+docker_image: pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+queue: 9c202a76-d435-4f51-ad78-813657dc89b2
+
+pages:
+  - title: Overview
+    file: overview.md
+  - title: Task 1
+    file: task1.md
+  - title: Task 2
+    file: task2.md
+  - title: Data
+    file: data.md
+  - title: Terms
+    file: terms.md
+
+phases:
+  - index: 0
+    name: Practice
+    description: Test phase
+    start: 2026-05-01
+    end: 2026-06-15
+    max_submissions_per_day: 5
+    execution_time_limit: 1800
+    tasks:
+      - 0
+      - 1
+
+  - index: 1
+    name: Competition
+    description: Competition phase
+    start: 2026-06-16
+    end: 2026-08-01
+    max_submissions_per_day: 2
+    execution_time_limit: 1800
+    tasks:
+      - 0
+      - 1
+
+tasks:
+  - index: 0
+    name: Task 1 – Surgical Instrument Keypoints Spatial Localisation
+    description: Detect surgical tool keypoints in fundus images and estimate tool–tissue distance, leveraging both fundus and iOCT data. Evaluated using AUC of Euclidean distance error, including modality-ablation test cases.
+    input_data: input_data.zip
+    reference_data: reference_data.zip
+    ingestion_program: ingestion_program_keypoints.zip
+    scoring_program: scoring_program_keypoints.zip
+  - index: 1
+    name: Task 2 – Intraoperative iOCT to Fundus Registration
+    description: Estimate the rigid 3D-to-2D transformation that aligns a volumetric iOCT scan to the corresponding fundus microscope image. Evaluated using AUC of corner error under real-time inference constraints.
+    input_data: input_data.zip
+    reference_data: reference_data.zip
+    ingestion_program: ingestion_program_registration.zip
+    scoring_program: scoring_program_registration.zip
+
+solutions:
+  - index: 0
+    path: sample_submission.zip
+    tasks:
+      - 0
+      - 1
+
+leaderboards:
+  - title: Results
+    key: main
+    columns:
+      - title: Test Case 1
+        key: test_case_1_score
+        index: 0
+        sorting: desc
+      - title: Test Case 2
+        key: test_case_2_score
+        index: 1
+        sorting: desc

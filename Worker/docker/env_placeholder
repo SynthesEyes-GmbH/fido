@@ -1,0 +1,9 @@
+create a .env file instead
+
+BROKER_URL=...
+BROKER_USE_SSL=True
+HOST_DIRECTORY=...
+DOCKER_SOCK=/var/run/docker.sock
+CONTAINER_ENGINE_EXECUTABLE=docker
+USE_GPU=True
+GPU_DEVICE=nvidia.com/gpu-all
