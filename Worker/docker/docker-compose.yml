@@ -1,6 +1,6 @@
 services:
   worker:
-    image: codalab/codabench-compute-worker:latest
+    image: codalab/codabench-compute-worker:v1.26
     container_name: compute_worker_codabench
     volumes:
       - ${HOST_DIRECTORY}:/codabench
