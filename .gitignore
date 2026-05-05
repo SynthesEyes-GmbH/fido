@@ -6,3 +6,4 @@
 .env
 Worker/data/*
 !Submission/Bundle/model.pth
+!Worker/data/.gitkeep

@@ -110,8 +110,8 @@ foreach ($folder in $otherFolders) {
 
 if (Test-Path $bundleZip) { Remove-Item $bundleZip -Force }
 
-# Root files (competition.yaml, logo.png, *.zip created above, etc.)
-$rootFiles = Get-ChildItem -Path $bundleFolder -File
+# Root files (competition.yaml, *.zip created above, etc.) — exclude scripts
+$rootFiles = Get-ChildItem -Path $bundleFolder -File | Where-Object { $_.Extension -notin @('.ps1', '.sh') }
 if ($rootFiles) {
     Compress-Archive -Path $rootFiles.FullName -DestinationPath $bundleZip
 }
