@@ -7,7 +7,7 @@ Usage:
 
 The submission folder must contain at minimum:
     inference.py
-    model.pth           (required)
+    model_{TASK_ID}.pth           (required)
     requirements.txt    (optional)
 """
 
@@ -72,7 +72,7 @@ def run_task(task_name: str, submission_dir: Path, task_cfg: dict) -> dict:
 
     if not data_dir.exists():
         print(f"  [ERROR] Test data not found: {data_dir}")
-        return {"score": 0.0, "error": f"Test data directory not found: {data_dir}"}
+        return {'final_score': 0.0, "error": f"Test data directory not found: {data_dir}"}
 
     with tempfile.TemporaryDirectory(prefix=f"fido_{task_name}_") as tmp:
         predictions_dir = Path(tmp) / "predictions"
@@ -101,7 +101,7 @@ def run_task(task_name: str, submission_dir: Path, task_cfg: dict) -> dict:
         pred_file = predictions_dir / "predictions.json"
         if not pred_file.exists():
             print("  [ERROR] ingestion did not produce predictions.json")
-            return {"score": 0.0, "error": "No predictions.json produced by ingestion"}
+            return {'final_score': 0.0, "error": "No predictions.json produced by ingestion"}
 
         with pred_file.open() as fh:
             preds = json.load(fh)
@@ -149,25 +149,25 @@ def main():
         print(f"ERROR: submission folder not found: {submission_dir}")
         sys.exit(1)
 
-    # Hard-error on missing required files
-    errors = []
-    if not (submission_dir / "inference.py").exists():
-        errors.append("inference.py is missing")
-    if not (submission_dir / "model.pth").exists():
-        errors.append("model.pth is missing")
-    if errors:
-        for e in errors:
-            print(f"ERROR: {e}")
-        sys.exit(1)
-
     tasks_to_run = ["keypoints", "registration"] if args.task == "both" else [args.task]
 
     all_scores = {}
-    for task_name in tasks_to_run:
+    for task_id, task_name in enumerate(tasks_to_run):
         try:
+            # Hard-error on missing required files
+            errors = []
+            if not (submission_dir / "inference.py").exists():
+                errors.append("inference.py is missing")
+            if not (submission_dir / f"model_{task_id}.pth").exists():
+                errors.append(f"model_{task_id}.pth is missing")
+            if errors:
+                for e in errors:
+                    print(f"ERROR: {e}")
+                sys.exit(1)
+
             scores = run_task(task_name, submission_dir, TASKS[task_name])
         except Exception as exc:
-            scores = {"score": 0.0, "error": str(exc)}
+            scores = {'final_score': 0.0, "error": str(exc)}
         all_scores[task_name] = scores
 
     # ---- Summary ----
@@ -179,7 +179,7 @@ def main():
         if error:
             print(f"  {task_name:>14}:  FAILED  — {error}")
         else:
-            print(f"  {task_name:>14}:  score = {scores.get('score'):.6f}"
+            print(f"  {task_name:>14}:  score = {scores.get('final_score'):.6f}"
                   f"  ({scores.get('num_cases', '?')} cases)"
                   f"  cuda={bool(scores.get('cuda_available'))}")
 

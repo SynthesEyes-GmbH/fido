@@ -8,13 +8,13 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+TASK_ID = 1
 
 CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Phase 2"
-
 OCT_ROOT = CHALLENGE_DATA_DIR / "OCT"
 OPMI_ROOT = CHALLENGE_DATA_DIR / "Opmi"
 NUMERICAL_ROOT = CHALLENGE_DATA_DIR / "Numerical"
-REQUIRED_FILES = {"inference.py", "model.pth"}
+REQUIRED_FILES = {"inference.py", "model_1.pth"}
 
 
 def install_requirements(submission_dir):
@@ -94,13 +94,13 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     module = load_submission_module(submission_dir)
-    model = module.load_model(str(submission_dir / "model.pth"))
+    model = module.load_model(str(submission_dir / f"model_{TASK_ID}.pth"))
 
     predictions = {}
     for case_id in case_ids():
         oct_volume = load_oct_volume(case_id)
         opmi_image = load_opmi_image(case_id)
-        prediction = module.inference(oct_volume, opmi_image, model)
+        prediction = module.inference(TASK_ID, oct_volume, opmi_image, model)
         predictions[case_id] = validate_prediction(prediction, case_id)
 
     with (output_dir / "predictions.json").open("w") as handle:

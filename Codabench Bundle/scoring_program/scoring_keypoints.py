@@ -17,6 +17,16 @@ def cuda_available():
         return False
 
 
+def find_file(root, name):
+    root = Path(root)
+    direct = root / name
+    if direct.exists():
+        return direct
+    matches = list(root.rglob(name))
+    if matches:
+        return matches[0]
+    raise FileNotFoundError(f"Could not find {name} under {root}")
+
 def load_reference(case_id):
     path = NUMERICAL_ROOT / case_id / f"{case_id}.json"
     with path.open() as handle:
@@ -40,7 +50,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        predictions_path = input_dir / "predictions.json"
+        predictions_path = find_file(input_dir, "predictions.json")
         with predictions_path.open() as handle:
             predictions = json.load(handle)
 
@@ -53,15 +63,19 @@ def main():
             ref = load_reference(case_id)
             kp = predictions[case_id]["keypoints"]
             errors.append(math.sqrt((kp[0] - ref[0]) ** 2 + (kp[1] - ref[1]) ** 2))
-
+        
+        print(round(auc_from_errors(errors)))
         scores = {
-            "score": round(auc_from_errors(errors), 6),
+            "final_score": round(auc_from_errors(errors), 6),
+            "time": 100,
             "num_cases": len(case_ids),
             "cuda_available": int(cuda_available()),
         }
     except Exception as exc:
+        print(exc)
         scores = {
-            "score": 0.0,
+            "final_score": 0.0,
+            "time": -1,
             "num_cases": 0,
             "cuda_available": int(cuda_available()),
             "error": str(exc),

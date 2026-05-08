@@ -8,13 +8,16 @@ def load_model(model_path):
     return
 
 
-def inference(oct_data, opmi_image, model):
+def inference(task_id, oct_data, opmi_image, model):
 
-    # Phase 1
-    return {
+    if task_id == 0:
+        return {
         'keypoints': np.random.rand(2).tolist(),
         'tool_tissue_distance': float(np.random.rand())
-    }
+        }
 
-    # Phase 2
-    return np.random.rand(3, 3)
+    if task_id == 1:
+        return np.random.rand(3, 3)
+    
+    else:
+        return None
