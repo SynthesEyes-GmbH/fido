@@ -1,6 +1,5 @@
 import json
 import math
-import os
 import sys
 from pathlib import Path
 
@@ -8,17 +7,6 @@ from pathlib import Path
 CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Phase 1"
 NUMERICAL_ROOT = CHALLENGE_DATA_DIR / "Numerical"
 MAX_THRESHOLD_PX = 50
-
-
-def find_file(root, name):
-    root = Path(root)
-    direct = root / name
-    if direct.exists():
-        return direct
-    matches = list(root.rglob(name))
-    if matches:
-        return matches[0]
-    raise FileNotFoundError(f"Could not find {name} under {root}")
 
 
 def cuda_available():
@@ -29,25 +17,12 @@ def cuda_available():
         return False
 
 
-def l2(point_a, point_b):
-    return math.sqrt((point_a[0] - point_b[0]) ** 2 + (point_a[1] - point_b[1]) ** 2)
-
-
-def corner_error(pred_points, ref_points):
-    """Mean L2 distance across 4 corner points. pred/ref are lists of 4 [x, y] pairs."""
-    if len(pred_points["Keypoints"]) != 2 or len(ref_points) != 2:
-        raise ValueError("Expected exactly 4 corner points")
-    return sum(l2(p, r) for p, r in zip(pred_points, ref_points)) / 4
-
-
 def load_reference(case_id):
     path = NUMERICAL_ROOT / case_id / f"{case_id}.json"
     with path.open() as handle:
         data = json.load(handle)
-    keypoints = data["Keypoints"]["Stereo Left"]
-    wide = keypoints["iOCT Wide Crosshair"]
-    # Return as ordered list of 4 [x, y] points
-    return [wide[k] for k in ("Start 0", "Start 1", "End 0", "End 1")]
+    wide = data["Keypoints"]["Stereo Left"]["iOCT Wide Crosshair"]
+    return wide["Start 0"]
 
 
 def auc_from_errors(errors, max_threshold=MAX_THRESHOLD_PX):
@@ -55,8 +30,7 @@ def auc_from_errors(errors, max_threshold=MAX_THRESHOLD_PX):
         raise ValueError("Cannot compute AUC with no errors")
     total = 0.0
     for threshold in range(max_threshold + 1):
-        accuracy = sum(error <= threshold for error in errors) / len(errors)
-        total += accuracy
+        total += sum(e <= threshold for e in errors) / len(errors)
     return total / (max_threshold + 1)
 
 
@@ -66,7 +40,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        predictions_path = find_file(input_dir, "predictions.json")
+        predictions_path = input_dir / "predictions.json"
         with predictions_path.open() as handle:
             predictions = json.load(handle)
 
@@ -76,13 +50,12 @@ def main():
 
         errors = []
         for case_id in case_ids:
-            ref_points = load_reference(case_id)
-            pred_points = predictions[case_id]  # [[x,y], [x,y], [x,y], [x,y]]
-            errors.append(corner_error(pred_points, ref_points))
+            ref = load_reference(case_id)
+            kp = predictions[case_id]["keypoints"]
+            errors.append(math.sqrt((kp[0] - ref[0]) ** 2 + (kp[1] - ref[1]) ** 2))
 
-        score = auc_from_errors(errors)
         scores = {
-            "score": round(score, 6),
+            "score": round(auc_from_errors(errors), 6),
             "num_cases": len(case_ids),
             "cuda_available": int(cuda_available()),
         }
