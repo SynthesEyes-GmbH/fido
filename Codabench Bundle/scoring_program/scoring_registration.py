@@ -110,14 +110,14 @@ def main():
         score = auc_from_errors(errors)
         scores = {
             "final_score": round(score, 6),
-            "time": 200,
+            "duration": 200,
             "num_cases": len(case_ids),
             "cuda_available": int(cuda_available()),
         }
     except Exception as exc:
         scores = {
             "final_score": 0.0,
-            "time": -1,
+            "duration": -1,
             "num_cases": 0,
             "cuda_available": int(cuda_available()),
             "error": str(exc),

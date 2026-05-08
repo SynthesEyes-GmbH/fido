@@ -58,9 +58,10 @@ tasks:
     ingestion_program: ingestion_program_registration.zip
     scoring_program: scoring_program_registration.zip
 
+
 solutions:
   - index: 0
-    path: sample_submission.zip
+    path: sample_submission
     tasks:
       - 0
       - 1
@@ -69,11 +70,11 @@ leaderboards:
   - title: Results
     key: main
     columns:
-      - title: Test Case 1
-        key: test_case_1_score
+      - title: Final Score
+        key: final_score
         index: 0
         sorting: desc
-      - title: Test Case 2
-        key: test_case_2_score
+      - title: Duration
+        key: duration
         index: 1
         sorting: desc

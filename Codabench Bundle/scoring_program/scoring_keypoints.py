@@ -67,7 +67,7 @@ def main():
         print(round(auc_from_errors(errors)))
         scores = {
             "final_score": round(auc_from_errors(errors), 6),
-            "time": 100,
+            "duration": 100,
             "num_cases": len(case_ids),
             "cuda_available": int(cuda_available()),
         }
@@ -75,7 +75,7 @@ def main():
         print(exc)
         scores = {
             "final_score": 0.0,
-            "time": -1,
+            "duration": -1,
             "num_cases": 0,
             "cuda_available": int(cuda_available()),
             "error": str(exc),
