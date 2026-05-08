@@ -85,4 +85,3 @@ zip -r my_submission.zip .
 ```
 
 > **Note:** `run_local.py` will exit with an error if `inference.py` or `model.pth` are missing.
-

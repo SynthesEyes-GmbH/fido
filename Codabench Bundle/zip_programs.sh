@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Builds Codabench Bundle.zip with the following rules:
 #
-#  ingestion_program/  ->  two zips, each with an internal subfolder:
-#      ingestion_program_keypoints.zip     (ingestion_program_keypoints/ingestion.py + metadata.yaml)
-#      ingestion_program_registration.zip  (ingestion_program_registration/ingestion.py + metadata.yaml)
+#  ingestion_program/  ->  two zips, flat at the zip root:
+#      ingestion_program_keypoints.zip     (ingestion.py + metadata.yaml at zip root)
+#      ingestion_program_registration.zip  (ingestion.py + metadata.yaml at zip root)
 #
-#  scoring_program/    ->  two zips, each with an internal subfolder:
-#      scoring_program_keypoints.zip       (scoring_program_keypoints/scoring.py + metadata.yaml)
-#      scoring_program_registration.zip    (scoring_program_registration/scoring.py + metadata.yaml)
+#  scoring_program/    ->  two zips, flat at the zip root:
+#      scoring_program_keypoints.zip       (scoring.py + metadata.yaml at zip root)
+#      scoring_program_registration.zip    (scoring.py + metadata.yaml at zip root)
 #
 #  All other subfolders (input_data, reference_data, sample_submission, …)
 #      are zipped flat (contents only, no wrapper folder).
@@ -35,11 +35,11 @@ make_program_zip() {
     local zip_dest="$5"        # output .zip path
 
     local stage="$TMP_DIR/$folder_name"
-    mkdir -p "$stage/$folder_name"
-    cp "$source_script" "$stage/$folder_name/$target_name"
-    cp "$metadata_src"  "$stage/$folder_name/metadata.yaml"
+    mkdir -p "$stage"
+    cp "$source_script" "$stage/$target_name"
+    cp "$metadata_src"  "$stage/metadata.yaml"
     rm -f "$zip_dest"
-    (cd "$stage" && zip -r "$zip_dest" "$folder_name")
+    (cd "$stage" && zip -r "$zip_dest" .)
     echo "Created: $zip_dest"
 }
 
