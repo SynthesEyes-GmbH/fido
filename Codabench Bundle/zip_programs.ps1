@@ -1,12 +1,12 @@
 # Builds Codabench Bundle.zip with the following rules:
 #
-#  ingestion_program/  ->  two zips, each with an internal subfolder:
-#      ingestion_program_keypoints.zip     (ingestion_program_keypoints/ingestion.py + metadata.yaml)
-#      ingestion_program_registration.zip  (ingestion_program_registration/ingestion.py + metadata.yaml)
+#  ingestion_program/  ->  two zips, flat at the zip root:
+#      ingestion_program_keypoints.zip     (ingestion.py + metadata.yaml at zip root)
+#      ingestion_program_registration.zip  (ingestion.py + metadata.yaml at zip root)
 #
-#  scoring_program/    ->  two zips, each with an internal subfolder:
-#      scoring_program_keypoints.zip       (scoring_program_keypoints/scoring.py + metadata.yaml)
-#      scoring_program_registration.zip    (scoring_program_registration/scoring.py + metadata.yaml)
+#  scoring_program/    ->  two zips, flat at the zip root:
+#      scoring_program_keypoints.zip       (scoring.py + metadata.yaml at zip root)
+#      scoring_program_registration.zip    (scoring.py + metadata.yaml at zip root)
 #
 #  All other subfolders (input_data, reference_data, sample_submission, …)
 #      are zipped flat (contents only, no wrapper folder).
@@ -39,15 +39,14 @@ function New-ProgramZip {
         [string]$SourceScript,       # full path to the source .py file
         [string]$TargetScriptName,   # name inside the zip (ingestion.py / scoring.py)
         [string]$MetadataSource,     # full path to metadata.yaml
-        [string]$ZipFolderName,      # folder name inside the zip
+        [string]$ZipFolderName,      # staging folder name
         [string]$ZipDestination      # full output .zip path
     )
     $stage = New-TempDir $ZipFolderName
-    $inner = New-Item -ItemType Directory -Path (Join-Path $stage $ZipFolderName) -Force
-    Copy-Item $SourceScript   (Join-Path $inner $TargetScriptName)
-    Copy-Item $MetadataSource (Join-Path $inner 'metadata.yaml')
+    Copy-Item $SourceScript   (Join-Path $stage $TargetScriptName)
+    Copy-Item $MetadataSource (Join-Path $stage 'metadata.yaml')
     if (Test-Path $ZipDestination) { Remove-Item $ZipDestination -Force }
-    Compress-Archive -Path (Join-Path $stage $ZipFolderName) -DestinationPath $ZipDestination
+    Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $ZipDestination
     Write-Host "Created: $ZipDestination"
     Remove-Item $stage -Recurse -Force
 }
