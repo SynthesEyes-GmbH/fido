@@ -24,7 +24,6 @@ def find_file(root, name):
 def cuda_available():
     try:
         import torch
-
         return bool(torch.cuda.is_available())
     except Exception:
         return False
@@ -36,7 +35,7 @@ def l2(point_a, point_b):
 
 def corner_error(pred_points, ref_points):
     """Mean L2 distance across 4 corner points. pred/ref are lists of 4 [x, y] pairs."""
-    if len(pred_points) != 4 or len(ref_points) != 4:
+    if len(pred_points["Keypoints"]) != 2 or len(ref_points) != 2:
         raise ValueError("Expected exactly 4 corner points")
     return sum(l2(p, r) for p, r in zip(pred_points, ref_points)) / 4
 

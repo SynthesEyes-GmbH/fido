@@ -21,8 +21,11 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-BUNDLE_ROOT    = Path(__file__).parent / "Codabench Bundle"
-TEST_DATA_ROOT = Path(__file__).parent / "Testing" / "data" / "Test Data"
+# BUNDLE_ROOT    = ... # Codabench Bundle Path
+# TEST_DATA_ROOT = ... # Data Path
+
+BUNDLE_ROOT = Path("D:/MICCAI Challenge/fido-2026/Codabench Bundle")
+TEST_DATA_ROOT = Path("D:/MICCAI Challenge/fido-2026/Worker/data/Test Data")
 
 TASKS = {
     "keypoints": {

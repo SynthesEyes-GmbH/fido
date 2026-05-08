@@ -96,14 +96,13 @@ def validate_prediction(prediction, case_id):
         raise ValueError(f"Prediction for {case_id} missing 'tool_tissue_distance'")
 
     kps = prediction["keypoints"]
-    if not isinstance(kps, dict):
-        raise ValueError(f"keypoints for {case_id} must be a dictionary")
+    if not isinstance(kps, list) or len(kps) != 2:
+        raise ValueError(f"keypoints for {case_id} must be a list with lenght of 2")
+    
+    print(kps)
 
     return {
-        "keypoints": {
-            key: validate_point(kps[key], f"{case_id} keypoints[{key}]")
-            for key in ("tip", "shaft")
-        },
+        "keypoints": kps,
         "tool_tissue_distance": float(prediction["tool_tissue_distance"]),
     }
 
