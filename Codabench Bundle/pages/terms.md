@@ -1,6 +1,5 @@
 # Terms and Conditions
 
-
 ## License
 
 The dataset is released under **CC BY-NC-ND** (Attribution-NonCommercial-NoDerivs). It may not be used for commercial purposes or redistributed in modified form.
@@ -9,10 +8,9 @@ The dataset is released under **CC BY-NC-ND** (Attribution-NonCommercial-NoDeriv
 
 | Award | Amount |
 |---|---|
-| Best performing team — Task 1 (Keypoints) | €500 |
-| Best performing team — Task 2 (Registration) | €500 |
-| Most innovative/impactful approach — Task 1 | €250 |
-| Most innovative/impactful approach — Task 2 | €250 |
+| Best performing team — Task 1 (Keypoint Detection) | ~€350 (Subject to Change) |
+| Best performing team — Task 2 (Registration) | ~€350 (Subject to Change) |
+| Most innovative/impactful approach | ~€350 (Subject to Change) | 
 
 The top-performing team per task is determined by the quantitative leaderboard. The most innovative/impactful approach is selected by the organizing committee. A single team may win both awards for the same task.
 
@@ -33,5 +31,3 @@ The top-performing team per task is determined by the quantitative leaderboard. 
 - Organizers will coordinate a joint results paper within six months of the challenge.
 - Each team nominates up to two main contributors as co-authors.
 - Individual publication of results is permitted after the joint paper is published, with citation of the official FIDO Challenge manuscript.
-
-

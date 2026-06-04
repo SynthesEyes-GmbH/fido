@@ -12,8 +12,8 @@ def inference(task_id, oct_data, opmi_image, model):
 
     if task_id == 0:
         return {
-        'keypoints': np.random.rand(2).tolist(),
-        'tool_tissue_distance': float(np.random.rand())
+            'keypoints': np.random.rand(2).tolist(),
+            'tool_tissue_distance': float(np.random.rand())
         }
 
     if task_id == 1:

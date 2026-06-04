@@ -13,7 +13,7 @@ Annotations are generated directly from simulation ground truth and validated by
 
 ## Task 1 — Keypoints & Tool–Tissue Distance
 
-- 25 training videos / 5 validation videos / 5 test videos (hidden)
+- 10 training videos / 5 test videos (hidden)
 - ~1,000 frames per video at 15 fps (~1 min each)
 - Per frame: fundus image + 2 iOCT cross-sections
 - Annotations: tool keypoints (fundus + iOCT), tool–tissue distance, iOCT-to-fundus transform, eye pose

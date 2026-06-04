@@ -23,8 +23,7 @@ Some test cases are evaluated with only one modality available (fundus-only or i
 
 | Split | Videos | Frames |
 |---|---|---|
-| Training | 25 | ~25,000 |
-| Validation | 5 | ~5,000 |
+| Training | 10 | ~25,000 |
 | Test (hidden) | 5 | ~5,000 |
 
-Fundus: 512×512 RGB. iOCT: 512×512 greyscale (2 slices per frame).
+Fundus: 1024x1024 RGB. iOCT: 512×512 greyscale (2 slices per frame).

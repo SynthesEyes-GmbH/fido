@@ -7,6 +7,13 @@ The **Fusion for Intelligent Decision-support in Ophthalmology (FIDO) Challenge*
 
 ---
 
+
+## Registration & Support
+ 
+- In order to get access to the dataset, please fill out this [form](https://forms.gle/jnpyrEV9w5R8qvSU7).
+- In case of any issues or support, please contact [FIDO 2026 Email](fido@syntheseyes.com).
+- Find out the scoring code and local tesing code [here](https://github.com/SynthesEyes-GmbH/fido-2026).
+
 ## Task 1 — Surgical Instrument Keypoints Spatial Localisation
 
 Detect surgical tool keypoints in fundus images and estimate tool–tissue distance, leveraging both fundus and iOCT data. Methods must remain robust when one modality is absent at inference time.
