@@ -12,7 +12,7 @@ Pipeline
    (a 3x3 matrix; bottom row is [0, 0, 1]).
 4. Warp the projection with that affine into the stereo frame.
 5. Overlay (augment) the warped projection on
-       <ROOT>/Scenario_0<SCENARIO>/Stereo Left/<VOL>/image.png
+       <ROOT>/Scenario_0<SCENARIO>/Stereo Left/<VOL>/microscope.png
    and save the result.
 
 About the affine coordinate convention
@@ -161,7 +161,7 @@ def process_vol(root: Path, scen: str, vol: str):
     """Build the warped projection and the overlay for one VOL."""
     volume_dir = root / scen / "iOCT Microscope" / "Volume" / vol
     json_path = root / scen / "Numerical" / f"{vol}.json"
-    stereo_path = root / scen / "Stereo Left" / vol / "image.png"
+    stereo_path = root / scen / "Stereo Left" / vol / "microscope.png"
 
     # 1-2. Load volume, project, and tile the B-scans.
     volume = load_volume(volume_dir)

@@ -74,7 +74,7 @@ def load_oct_volume(case_id):
 
 
 def load_opmi_image(case_id):
-    image_path = OPMI_ROOT / case_id / "image.png"
+    image_path = OPMI_ROOT / case_id / "microscope.png"
     with Image.open(image_path) as image:
         return np.array(image.convert("RGB"))
 

@@ -83,7 +83,7 @@ comp_data/
       *.png
   Opmi/
     <case_id>/
-      image.png
+      microscope.png
   Numerical/
     <case_id>/
       <case_id>.json

@@ -4,7 +4,7 @@ Show the Phase 1 ground-truth point on the Stereo-Left view, next to its B-scans
 Pipeline
 --------
 1. Load the stereo image from
-       <ROOT>/Scenario_0<SCENARIO>/Stereo Left/<FRAME>/image.png   (1024x1024)
+       <ROOT>/Scenario_0<SCENARIO>/Stereo Left/<FRAME>/microscope.png   (1024x1024)
 2. Load the ground truth from
        <ROOT>/Scenario_0<SCENARIO>/Numerical/<FRAME*10>.json  ->  ["Ground Truth"]["Phase 1"]
    which is [x, y, z]: (x, y) are pixel coords in the stereo image; z is the
@@ -46,9 +46,7 @@ from draw_utils import (
 
 
 def numerical_name(frame: str) -> str:
-    """Map a Stereo/Bscan frame folder (e.g. '00010') to its JSON name ('00100')."""
-    return f"{int(frame) * 10:05d}"
-
+    return f"{int(frame) * 1:05d}"
 
 def load_phase1_point(json_path: Path):
     """Load ['Ground Truth']['Phase 1'] -> (x, y, z) floats."""
@@ -135,7 +133,7 @@ def lowest_x_instrument_point(seg: np.ndarray):
 
 def process_frame(root: Path, scen: str, frame: str) -> np.ndarray:
     """Build the composite view for one frame."""
-    stereo_path = root / scen / "Stereo Left" / frame / "image.png"
+    stereo_path = root / scen / "Stereo Left" / frame / "microscope.png"
     json_path = root / scen / "Numerical" / f"{numerical_name(frame)}.json"
     bscan_dir = root / scen / "iOCT Microscope" / "Bscan" / frame
 
