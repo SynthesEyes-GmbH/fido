@@ -6,6 +6,18 @@ from pathlib import Path
 
 CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Task 1"
 MAX_THRESHOLD_PX = 10
+MAX_THRESHOLD_DIST = 10
+KEYPOINT_WEIGHT = 0.7
+DISTANCE_WEIGHT = 0.3
+
+# Ground Truth.Task 1[2] is stored at 10x the true tool-tip-to-retina pixel
+# distance on the B-scan image (e.g. stored 613.7916 -> true 61.37916 px).
+# tool_tissue_distance predictions are expected in true B-scan pixel units,
+# so the stored ground truth is divided by this factor before computing
+# error. This keeps distance_auc on the same pixel scale (and threshold) as
+# keypoint_auc, so the two are comparable before KEYPOINT_WEIGHT/DISTANCE_WEIGHT
+# are applied.
+GROUND_TRUTH_DISTANCE_SCALE = 10
 
 
 def cuda_available():
@@ -27,12 +39,16 @@ def find_file(root, name):
     raise FileNotFoundError(f"Could not find {name} under {root}")
 
 def load_reference(case_id):
+    """Returns (keypoint [x, y], tool_tissue_distance_px) ground truth for a case.
+
+    tool_tissue_distance_px is the true tool-tip-to-retina pixel distance on
+    the B-scan image, i.e. the stored value divided by GROUND_TRUTH_DISTANCE_SCALE."""
     scenario_name, frame_id = case_id.rsplit("_", 1)
     path = CHALLENGE_DATA_DIR / scenario_name / "Numerical" / f"{frame_id}.json"
     with path.open() as handle:
         data = json.load(handle)
     ground_truth = data["Ground Truth"]["Task 1"]
-    return ground_truth[:2]
+    return ground_truth[:2], ground_truth[2] / GROUND_TRUTH_DISTANCE_SCALE
 
 
 def load_duration(input_dir):
@@ -71,15 +87,24 @@ def main():
         if not case_ids:
             raise ValueError("predictions.json is empty")
 
-        errors = []
+        keypoint_errors = []
+        distance_errors = []
         for case_id in case_ids:
-            ref = load_reference(case_id)
+            ref_kp, ref_dist = load_reference(case_id)
             kp = predictions[case_id]["keypoints"]
-            errors.append(math.sqrt((kp[0] - ref[0]) ** 2 + (kp[1] - ref[1]) ** 2))
+            keypoint_errors.append(math.sqrt((kp[0] - ref_kp[0]) ** 2 + (kp[1] - ref_kp[1]) ** 2))
 
-        print(round(auc_from_errors(errors)))
+            pred_dist = predictions[case_id]["tool_tissue_distance"]
+            distance_errors.append(abs(pred_dist - ref_dist))
+
+        keypoint_auc = auc_from_errors(keypoint_errors, MAX_THRESHOLD_PX)
+        distance_auc = auc_from_errors(distance_errors, MAX_THRESHOLD_DIST)
+        final_score = KEYPOINT_WEIGHT * keypoint_auc + DISTANCE_WEIGHT * distance_auc
+
         scores = {
-            "final_score": round(auc_from_errors(errors), 6),
+            "final_score": round(final_score, 6),
+            "keypoint_auc": round(keypoint_auc, 6),
+            "distance_auc": round(distance_auc, 6),
             "duration": load_duration(input_dir),
             "num_cases": len(case_ids),
             "cuda_available": int(cuda_available()),

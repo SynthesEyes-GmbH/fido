@@ -1,4 +1,5 @@
 *.zip
+!Codabench Bundle/releases/*.zip
 **/__pycache__/
 **/.pytest_cache/
 *.pt
