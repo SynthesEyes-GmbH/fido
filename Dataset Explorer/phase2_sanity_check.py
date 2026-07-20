@@ -8,16 +8,16 @@ Pipeline
    and stack them into a 3D array.
 2. Average projection along the volume's last axis -> 2D en-face image.
 3. Load the affine from
-       <ROOT>/Scenario_0<SCENARIO>/Numerical/<VOL>.json  ->  ["Ground Truth"]["Phase 2"]
+       <ROOT>/Scenario_0<SCENARIO>/Numerical/<VOL>.json  ->  ["Ground Truth"]["Task 2"]
    (a 3x3 matrix; bottom row is [0, 0, 1]).
 4. Warp the projection with that affine into the stereo frame.
 5. Overlay (augment) the warped projection on
-       <ROOT>/Scenario_0<SCENARIO>/Stereo Left/<VOL>/microscope.png
+       <ROOT>/Scenario_0<SCENARIO>/Stereo Left/<VOL>/image.png
    and save the result.
 
 About the affine coordinate convention
 --------------------------------------
-The "Phase 2" matrix maps *normalized* [-1, 1] image coordinates (origin at the
+The "Task 2" matrix maps *normalized* [-1, 1] image coordinates (origin at the
 image centre) to *pixel* coordinates in the 1024x1024 stereo image. This was
 verified against the data: M @ [0, 0, 1] == translation == the centre of the
 "iOCT Microscope Crosshair" keypoints, and the linear part's scale equals half
@@ -28,7 +28,7 @@ square's edge midpoints) that the affine transforms onto those crosshair tips.
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-ROOT = r"D:\FIDO Challenge\Dataset\Phase 2"
+ROOT = r"D:\FIDO Challenge\Dataset\Task 2"
 SCENARIO = 1            # scenario index -> Scenario_02
 VOL = "00000"           # volume index / folder to START on (Enter advances)
 ALPHA = 0.35            # overlay opacity
@@ -126,12 +126,12 @@ def bscan_montage(volume: np.ndarray, rows: int = 11, cols: int = 12) -> np.ndar
 
 
 def load_affine(json_path: Path) -> np.ndarray:
-    """Load ['Ground Truth']['Phase 2'] as a 3x3 affine matrix."""
+    """Load ['Ground Truth']['task 2'] as a 3x3 affine matrix."""
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    mat = data["Ground Truth"]["Phase 2"]
+    mat = data["Ground Truth"]["Task 2"]
     if mat is None:
-        raise ValueError(f"['Ground Truth']['Phase 2'] is null in {json_path}")
+        raise ValueError(f"['Ground Truth']['task 2'] is null in {json_path}")
     M = np.asarray(mat, dtype=np.float64)
     if M.shape != (3, 3):
         raise ValueError(f"Expected a 3x3 affine, got {M.shape}")
@@ -161,7 +161,7 @@ def process_vol(root: Path, scen: str, vol: str):
     """Build the warped projection and the overlay for one VOL."""
     volume_dir = root / scen / "iOCT Microscope" / "Volume" / vol
     json_path = root / scen / "Numerical" / f"{vol}.json"
-    stereo_path = root / scen / "Stereo Left" / vol / "microscope.png"
+    stereo_path = root / scen / "Stereo Left" / vol / "image.png"
 
     # 1-2. Load volume, project, and tile the B-scans.
     volume = load_volume(volume_dir)

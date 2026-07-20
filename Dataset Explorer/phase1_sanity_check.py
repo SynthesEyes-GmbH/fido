@@ -1,12 +1,12 @@
 """
-Show the Phase 1 ground-truth point on the Stereo-Left view, next to its B-scans.
+Show the task 1 ground-truth point on the Stereo-Left view, next to its B-scans.
 
 Pipeline
 --------
 1. Load the stereo image from
-       <ROOT>/Scenario_0<SCENARIO>/Stereo Left/<FRAME>/microscope.png   (1024x1024)
+       <ROOT>/Scenario_0<SCENARIO>/Stereo Left/<FRAME>/image.png   (1024x1024)
 2. Load the ground truth from
-       <ROOT>/Scenario_0<SCENARIO>/Numerical/<FRAME*10>.json  ->  ["Ground Truth"]["Phase 1"]
+       <ROOT>/Scenario_0<SCENARIO>/Numerical/<FRAME*10>.json  ->  ["Ground Truth"]["Task 1"]
    which is [x, y, z]: (x, y) are pixel coords in the stereo image; z is the
    retina distance.
 3. Draw a marker at (x, y) on the stereo image.
@@ -24,7 +24,7 @@ but the matching Numerical JSON is named frame_id * 10 (folder 00001 ->
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-ROOT = r"D:\FIDO Challenge\Dataset\Phase 1"
+ROOT = r"D:\FIDO Challenge\Dataset\Task 1"
 SCENARIO = 1            # scenario index -> Scenario_01
 FRAME = "00010"         # Stereo Left / Bscan folder to START on (Enter advances)
 
@@ -49,14 +49,14 @@ def numerical_name(frame: str) -> str:
     return f"{int(frame) * 1:05d}"
 
 def load_phase1_point(json_path: Path):
-    """Load ['Ground Truth']['Phase 1'] -> (x, y, z) floats."""
+    """Load ['Ground Truth']['task 1'] -> (x, y, z) floats."""
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    pt = data["Ground Truth"]["Phase 1"]
+    pt = data["Ground Truth"]["Task 1"]
     if pt is None:
-        raise ValueError(f"['Ground Truth']['Phase 1'] is null in {json_path}")
+        raise ValueError(f"['Ground Truth']['task 1'] is null in {json_path}")
     x, y, z = (float(v) for v in pt)
-    print(f"Phase 1 point from {json_path.name}: x={x:.2f} y={y:.2f} z={z:.4f}")
+    print(f"task 1 point from {json_path.name}: x={x:.2f} y={y:.2f} z={z:.4f}")
     return x, y, z
 
 
@@ -133,7 +133,7 @@ def lowest_x_instrument_point(seg: np.ndarray):
 
 def process_frame(root: Path, scen: str, frame: str) -> np.ndarray:
     """Build the composite view for one frame."""
-    stereo_path = root / scen / "Stereo Left" / frame / "microscope.png"
+    stereo_path = root / scen / "Stereo Left" / frame / "image.png"
     json_path = root / scen / "Numerical" / f"{numerical_name(frame)}.json"
     bscan_dir = root / scen / "iOCT Microscope" / "Bscan" / frame
 
@@ -176,7 +176,7 @@ def main():
         print(f"FRAME {FRAME!r} not found; starting at first ({frames[0]}).")
         idx = 0
 
-    win = "phase 1 point + bscans"
+    win = "task 1 point + bscans"
     print("Enter / Space / Right = next   |   Left / p = previous   |   Esc / q = quit")
 
     while 0 <= idx < len(frames):

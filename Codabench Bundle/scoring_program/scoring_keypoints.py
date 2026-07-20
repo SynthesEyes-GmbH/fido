@@ -4,9 +4,8 @@ import sys
 from pathlib import Path
 
 
-CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Phase 1"
-NUMERICAL_ROOT = CHALLENGE_DATA_DIR / "Numerical"
-MAX_THRESHOLD_PX = 50
+CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Task 1"
+MAX_THRESHOLD_PX = 10
 
 
 def cuda_available():
@@ -28,11 +27,25 @@ def find_file(root, name):
     raise FileNotFoundError(f"Could not find {name} under {root}")
 
 def load_reference(case_id):
-    path = NUMERICAL_ROOT / case_id / f"{case_id}.json"
+    scenario_name, frame_id = case_id.rsplit("_", 1)
+    path = CHALLENGE_DATA_DIR / scenario_name / "Numerical" / f"{frame_id}.json"
     with path.open() as handle:
         data = json.load(handle)
-    wide = data["Keypoints"]["Stereo Left"]["iOCT Wide Crosshair"]
-    return wide["Start 0"]
+    ground_truth = data["Ground Truth"]["Task 1"]
+    return ground_truth[:2]
+
+
+def load_duration(input_dir):
+    """Read the total ingestion wall-clock time written by the ingestion program.
+
+    Falls back to -1 if durations.json is missing (e.g. older ingestion runs)."""
+    try:
+        durations_path = find_file(input_dir, "durations.json")
+    except FileNotFoundError:
+        return -1
+    with durations_path.open() as handle:
+        data = json.load(handle)
+    return data.get("total_seconds", -1)
 
 
 def auc_from_errors(errors, max_threshold=MAX_THRESHOLD_PX):
@@ -63,11 +76,11 @@ def main():
             ref = load_reference(case_id)
             kp = predictions[case_id]["keypoints"]
             errors.append(math.sqrt((kp[0] - ref[0]) ** 2 + (kp[1] - ref[1]) ** 2))
-        
+
         print(round(auc_from_errors(errors)))
         scores = {
             "final_score": round(auc_from_errors(errors), 6),
-            "duration": 100,
+            "duration": load_duration(input_dir),
             "num_cases": len(case_ids),
             "cuda_available": int(cuda_available()),
         }

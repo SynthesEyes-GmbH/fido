@@ -15,8 +15,8 @@ _font_cache: dict[int, ImageFont.FreeTypeFont] = {}
 _logo_cache = None
 _logo_loaded = False
 
-# Shared layout: both phase windows render at this height; the logo is a fixed
-# width so it does not scale up on the wider phase 2 canvas.
+# Shared layout: both task windows render at this height; the logo is a fixed
+# width so it does not scale up on the wider task 2 canvas.
 CANVAS_H = 768
 LOGO_W = 300
 

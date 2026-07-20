@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -10,11 +11,9 @@ from PIL import Image
 
 TASK_ID = 1
 
-CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Phase 2"
-OCT_ROOT = CHALLENGE_DATA_DIR / "OCT"
-OPMI_ROOT = CHALLENGE_DATA_DIR / "Opmi"
-NUMERICAL_ROOT = CHALLENGE_DATA_DIR / "Numerical"
+CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Task 2"
 REQUIRED_FILES = {"inference.py", "model_1.pth"}
+PER_CASE_TIME_LIMIT_SECONDS = 20
 
 
 def install_requirements(submission_dir):
@@ -45,27 +44,38 @@ def load_submission_module(submission_dir):
     if not hasattr(module, "load_model"):
         raise AttributeError("inference.py must define load_model(model_path)")
     if not hasattr(module, "inference"):
-        raise AttributeError("inference.py must define inference(oct_volume, fundus_image, model)")
+        raise AttributeError("inference.py must define inference(task_id, oct_volume, opmi_image, model)")
     return module
 
 
-def case_ids():
-    oct_ids = {path.name for path in OCT_ROOT.iterdir() if path.is_dir()}
-    opmi_ids = {path.name for path in OPMI_ROOT.iterdir() if path.is_dir()}
-    numerical_ids = {path.name for path in NUMERICAL_ROOT.iterdir() if path.is_dir()}
-    ids = sorted(oct_ids & opmi_ids & numerical_ids)
+def scenario_dirs():
+    scenarios = sorted(path for path in CHALLENGE_DATA_DIR.iterdir() if path.is_dir())
+    if not scenarios:
+        raise FileNotFoundError(f"No scenario directories found under {CHALLENGE_DATA_DIR}")
+    return scenarios
+
+
+def frame_ids(scenario_dir):
+    numerical_root = scenario_dir / "Numerical"
+    stereo_root = scenario_dir / "Stereo Left"
+    numerical_ids = {path.stem for path in numerical_root.glob("*.json")}
+    stereo_ids = {path.name for path in stereo_root.iterdir() if path.is_dir()}
+    ids = sorted(numerical_ids & stereo_ids)
     if not ids:
         raise FileNotFoundError(
-            f"No complete case ids found under {CHALLENGE_DATA_DIR}. "
-            "Expected OCT, Opmi, and Numerical subdirectories."
+            f"No complete frames found under {scenario_dir}. "
+            "Expected matching Numerical/*.json and Stereo Left/<frame_id> entries."
         )
     return ids
 
 
-def load_oct_volume(case_id):
-    slices = sorted((OCT_ROOT / case_id).glob("*.png"))
+def load_oct_volume(scenario_dir, frame_id):
+    volume_dir = scenario_dir / "iOCT Microscope" / "Volume" / frame_id
+    if not volume_dir.is_dir():
+        return None
+    slices = sorted(volume_dir.glob("*.png"))
     if not slices:
-        raise FileNotFoundError(f"No OCT slices found for case {case_id}")
+        return None
     volume = []
     for path in slices:
         with Image.open(path) as image:
@@ -73,8 +83,8 @@ def load_oct_volume(case_id):
     return np.stack(volume, axis=0)
 
 
-def load_opmi_image(case_id):
-    image_path = OPMI_ROOT / case_id / "microscope.png"
+def load_opmi_image(scenario_dir, frame_id):
+    image_path = scenario_dir / "Stereo Left" / frame_id / "microscope.png"
     with Image.open(image_path) as image:
         return np.array(image.convert("RGB"))
 
@@ -97,14 +107,42 @@ def main():
     model = module.load_model(str(submission_dir / f"model_{TASK_ID}.pth"))
 
     predictions = {}
-    for case_id in case_ids():
-        oct_volume = load_oct_volume(case_id)
-        opmi_image = load_opmi_image(case_id)
-        prediction = module.inference(TASK_ID, oct_volume, opmi_image, model)
-        predictions[case_id] = validate_prediction(prediction, case_id)
+    case_durations = {}
+    timed_out_cases = []
+    total_start = time.monotonic()
+
+    for scenario_dir in scenario_dirs():
+        for frame_id in frame_ids(scenario_dir):
+            case_id = f"{scenario_dir.name}_{frame_id}"
+            oct_volume = load_oct_volume(scenario_dir, frame_id)
+            opmi_image = load_opmi_image(scenario_dir, frame_id)
+
+            case_start = time.monotonic()
+            prediction = module.inference(TASK_ID, oct_volume, opmi_image, model)
+            elapsed = time.monotonic() - case_start
+            case_durations[case_id] = elapsed
+
+            if elapsed > PER_CASE_TIME_LIMIT_SECONDS:
+                timed_out_cases.append(case_id)
+                continue
+
+            predictions[case_id] = validate_prediction(prediction, case_id)
+
+    total_elapsed = time.monotonic() - total_start
 
     with (output_dir / "predictions.json").open("w") as handle:
         json.dump(predictions, handle)
+
+    with (output_dir / "durations.json").open("w") as handle:
+        json.dump(
+            {
+                "total_seconds": total_elapsed,
+                "per_case_seconds": case_durations,
+                "timed_out_cases": timed_out_cases,
+                "per_case_time_limit_seconds": PER_CASE_TIME_LIMIT_SECONDS,
+            },
+            handle,
+        )
 
 
 if __name__ == "__main__":

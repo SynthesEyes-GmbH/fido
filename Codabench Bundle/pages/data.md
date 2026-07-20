@@ -21,13 +21,13 @@ Annotations are generated directly from simulation ground truth and validated by
 ## Task 2 — iOCT-to-Fundus Registration
 
 - 150 training / 30 validation / 30 test snapshots (hidden)
-- Per snapshot: 1024×1024 fundus image + 512×256×256 iOCT volume (256 slices of 256×256)
+- Per snapshot: 1024×1024 fundus image + 128×512×512 iOCT volume (128 slices of 512×512)
 - Annotations: ground-truth 3D-to-2D transformation, vessel segmentations, retinal layer masks
 
 ## Submission
 
 Submissions are Docker containers evaluated on Codabench. The hidden test data resides on the evaluation worker. The `input_data.zip` and `reference_data.zip` in this bundle are placeholders.
 
-Required files: `inference.py`, `model.pth`. Optional: `requirements.txt` (packages installed before inference). Extra files are permitted.
+Required files: `inference.py`, `model_<task_id>.pth` (e.g. `model_0.pth` for Task 1, `model_1.pth` for Task 2). Optional: `requirements.txt` (packages installed before inference). Extra files are permitted.
 
 All submissions must run inference on a single NVIDIA GPU (<24 GB). Per-case inference time limits will be announced at dataset release.

@@ -24,19 +24,20 @@ from pathlib import Path
 # BUNDLE_ROOT    = ... # Codabench Bundle Path
 # TEST_DATA_ROOT = ... # Data Path
 
-BUNDLE_ROOT = Path("D:/MICCAI Challenge/fido-2026/Codabench Bundle")
-TEST_DATA_ROOT = Path("D:/MICCAI Challenge/fido-2026/Worker/data/Test Data")
-
+BUNDLE_ROOT = Path("D:/fido/Codabench Bundle")
+TEST_DATA_ROOT = Path("D:/FIDO Challenge/Dataset/Mock Test")
 TASKS = {
     "keypoints": {
         "ingestion": BUNDLE_ROOT / "ingestion_program" / "ingestion_keypoints.py",
         "scoring":   BUNDLE_ROOT / "scoring_program"   / "scoring_keypoints.py",
-        "phase":     "Phase 1",
+        "task":     "Task 1",
+        "id": 0
     },
     "registration": {
         "ingestion": BUNDLE_ROOT / "ingestion_program" / "ingestion_registration.py",
         "scoring":   BUNDLE_ROOT / "scoring_program"   / "scoring_registration.py",
-        "phase":     "Phase 2",
+        "task":     "Task 2",
+        "id": 1,
     },
 }
 
@@ -56,19 +57,13 @@ def patch_data_paths(mod, data_dir: Path):
     data_dir = Path(data_dir)
     if hasattr(mod, "CHALLENGE_DATA_DIR"):
         mod.CHALLENGE_DATA_DIR = data_dir
-    if hasattr(mod, "OCT_ROOT"):
-        mod.OCT_ROOT = data_dir / "OCT"
-    if hasattr(mod, "OPMI_ROOT"):
-        mod.OPMI_ROOT = data_dir / "Opmi"
-    if hasattr(mod, "NUMERICAL_ROOT"):
-        mod.NUMERICAL_ROOT = data_dir / "Numerical"
 
 
 # ---------------------------------------------------------------------------
 # Core runner
 # ---------------------------------------------------------------------------
 def run_task(task_name: str, submission_dir: Path, task_cfg: dict) -> dict:
-    data_dir = TEST_DATA_ROOT / task_cfg["phase"]
+    data_dir = TEST_DATA_ROOT / task_cfg["task"]
 
     if not data_dir.exists():
         print(f"  [ERROR] Test data not found: {data_dir}")
@@ -126,6 +121,15 @@ def run_task(task_name: str, submission_dir: Path, task_cfg: dict) -> dict:
         with (scores_dir / "scores.json").open() as fh:
             scores = json.load(fh)
 
+        durations_file = predictions_dir / "durations.json"
+        if durations_file.exists():
+            with durations_file.open() as fh:
+                durations = json.load(fh)
+            per_case = durations.get("per_case_seconds", {})
+            if per_case:
+                scores["avg_case_duration"] = sum(per_case.values()) / len(per_case)
+            scores["timed_out_cases"] = durations.get("timed_out_cases", [])
+
         return scores
 
 
@@ -152,7 +156,9 @@ def main():
     tasks_to_run = ["keypoints", "registration"] if args.task == "both" else [args.task]
 
     all_scores = {}
-    for task_id, task_name in enumerate(tasks_to_run):
+    for task_name in tasks_to_run:
+
+        task_id = TASKS[task_name]["id"]
         try:
             # Hard-error on missing required files
             errors = []
@@ -179,9 +185,14 @@ def main():
         if error:
             print(f"  {task_name:>14}:  FAILED  — {error}")
         else:
+            avg_duration = scores.get("avg_case_duration")
+            avg_duration_str = f"{avg_duration:.3f}s" if avg_duration is not None else "?"
+            timed_out = scores.get("timed_out_cases") or []
             print(f"  {task_name:>14}:  score = {scores.get('final_score'):.6f}"
                   f"  ({scores.get('num_cases', '?')} cases)"
-                  f"  cuda={bool(scores.get('cuda_available'))}")
+                  f"  cuda={bool(scores.get('cuda_available'))}"
+                  f"  avg_case_duration={avg_duration_str}"
+                  f"  timed_out={len(timed_out)}")
 
 
 if __name__ == "__main__":

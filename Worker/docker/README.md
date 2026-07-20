@@ -78,16 +78,40 @@ Expected structure:
 
 ```text
 comp_data/
-  OCT/
-    <case_id>/
-      *.png
-  Opmi/
-    <case_id>/
-      microscope.png
-  Numerical/
-    <case_id>/
-      <case_id>.json
+  Test Data/
+    Task 1/
+      Scenario_<id>/
+        Numerical/
+          <frame_id>.json
+        Stereo Left/
+          <frame_id>/
+            microscope.png
+            visibility.png
+            Segmentation/
+        iOCT Microscope/
+          properties.json
+          Bscan/
+            <frame_id>/
+              *.png
+        Canvas/
+          <frame_id>.png
+    Task 2/
+      Scenario_<id>/
+        Numerical/
+          <frame_id>.json
+        Stereo Left/
+          <frame_id>/
+            microscope.png
+            visibility.png
+            Segmentation/
+        iOCT Microscope/
+          properties.json
+          Volume/
+            <frame_id>/
+              *.png
 ```
+
+`iOCT Microscope/Bscan/<frame_id>` (Task 1) or `.../Volume/<frame_id>` (Task 2) may be absent for some frames — this is intentional modality dropout, and the ingestion program passes `None` for the iOCT volume in that case. Frame ids are unique only within a scenario, so the ingestion/scoring programs key cases as `<Scenario_id>_<frame_id>`.
 
 ## Setup On A New Machine
 

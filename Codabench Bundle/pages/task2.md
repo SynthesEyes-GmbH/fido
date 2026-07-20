@@ -24,4 +24,4 @@ AUC = mean accuracy(t) over t = 0..threshold
 | Training | 150 | 150 | 150 |
 | Test (hidden) | 30 | 30 | 30 |
 
-Fundus: 512×512 RGB. iOCT volume: 128x512x512 greyscale (provided as 128 slices of 512×512).
+Fundus: 1024×1024 RGB. iOCT volume: 128x512x512 greyscale (provided as 128 slices of 512×512).

@@ -6,9 +6,8 @@ import sys
 from pathlib import Path
 
 
-CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Phase 2"
-NUMERICAL_ROOT = CHALLENGE_DATA_DIR / "Numerical"
-MAX_THRESHOLD_PX = 50
+CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Task 2"
+MAX_THRESHOLD_PX = 10
 
 # Canonical unit-square corners in homogeneous 2D coordinates (4 x 3)
 # Used to project through H and measure reprojection error
@@ -63,15 +62,28 @@ def corner_error(pred_points, ref_points):
 
 def load_reference(case_id):
     """Load the ground-truth (3, 3) homography matrix for a case."""
-    # path = NUMERICAL_ROOT / case_id / f"{case_id}.json"
-    # with path.open() as handle:
-    #     data = json.load(handle)
-    # H = np.asarray(data["homography"], dtype=np.float64)
+    scenario_name, frame_id = case_id.rsplit("_", 1)
+    path = CHALLENGE_DATA_DIR / scenario_name / "Numerical" / f"{frame_id}.json"
+    with path.open() as handle:
+        data = json.load(handle)
+    H = np.asarray(data["Ground Truth"]["Task 2"], dtype=np.float64)
 
-    H = np.random.rand(3, 3)
     if H.shape != (3, 3):
         raise ValueError(f"Reference homography for {case_id} has shape {H.shape}, expected (3, 3)")
     return H
+
+
+def load_duration(input_dir):
+    """Read the total ingestion wall-clock time written by the ingestion program.
+
+    Falls back to -1 if durations.json is missing (e.g. older ingestion runs)."""
+    try:
+        durations_path = find_file(input_dir, "durations.json")
+    except FileNotFoundError:
+        return -1
+    with durations_path.open() as handle:
+        data = json.load(handle)
+    return data.get("total_seconds", -1)
 
 
 def auc_from_errors(errors, max_threshold=MAX_THRESHOLD_PX):
@@ -110,7 +122,7 @@ def main():
         score = auc_from_errors(errors)
         scores = {
             "final_score": round(score, 6),
-            "duration": 200,
+            "duration": load_duration(input_dir),
             "num_cases": len(case_ids),
             "cuda_available": int(cuda_available()),
         }
