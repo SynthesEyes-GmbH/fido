@@ -1,1 +1,7 @@
+# compute_worker v1.30 mounts, for the scoring_program container:
+#   /app/program   <- this scoring_program bundle (scoring.py + metadata.yaml)
+#   /app/output     <- writable; scoring.py writes scores.json here
+#   /app/data        <- read-only host dataset (HOST_DIRECTORY/data/comp_data/...), used for ground truth
+#   /app/input        <- ingestion's uploaded prediction_result.zip, unpacked here (predictions.json, durations.json)
+#   /app/shared      <- shared scratch dir if ingestion runs alongside scoring (ingestion_only_during_scoring)
 command: python3 /app/program/scoring.py /app/input /app/output

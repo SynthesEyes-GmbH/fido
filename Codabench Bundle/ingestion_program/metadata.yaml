@@ -1,1 +1,6 @@
+# compute_worker v1.30 mounts, for the ingestion_program container:
+#   /app/program           <- this ingestion_program bundle (ingestion.py + metadata.yaml)
+#   /app/output             <- writable; ingestion.py writes predictions.json + durations.json here
+#   /app/data                <- read-only host dataset (HOST_DIRECTORY/data/comp_data/...)
+#   /app/ingested_program  <- read-only; the submitted model bundle (inference.py + model_<task>.pth)
 command: python3 /app/program/ingestion.py /app/output /app/ingested_program

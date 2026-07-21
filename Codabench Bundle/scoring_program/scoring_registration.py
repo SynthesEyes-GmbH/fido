@@ -1,4 +1,5 @@
 import json
+import logging
 import math
 import numpy as np
 import os
@@ -97,6 +98,8 @@ def auc_from_errors(errors, max_threshold=MAX_THRESHOLD_PX):
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+
     input_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/app/input")
     output_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("/app/output")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -110,6 +113,8 @@ def main():
         if not case_ids:
             raise ValueError("predictions.json is empty")
 
+        logging.info(f"{len(case_ids)} predictions is loaded for the scoring of Task 2")
+
         errors = []
         for case_id in case_ids:
             ref_H = load_reference(case_id)
@@ -120,6 +125,9 @@ def main():
             errors.append(corner_error(pred_corners, ref_corners))
 
         score = auc_from_errors(errors)
+
+        logging.info(f"Scoring of Task 2 is done: final_score={score}")
+
         scores = {
             "final_score": round(score, 6),
             "duration": load_duration(input_dir),

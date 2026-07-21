@@ -1,6 +1,5 @@
 import importlib.util
 import json
-import os
 import subprocess
 import sys
 import time
@@ -8,6 +7,10 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
+
+
+import logging
+
 
 TASK_ID = 0
 
@@ -27,6 +30,8 @@ def install_requirements(submission_dir):
 
 
 def load_submission_module(submission_dir):
+
+    logging.info(f"{submission_dir} is created for this submission.")
 
     submission_dir = Path(submission_dir)
     entries = {path.name for path in submission_dir.iterdir() if path.is_file()}
@@ -49,9 +54,13 @@ def load_submission_module(submission_dir):
 
 
 def scenario_dirs():
+    
     scenarios = sorted(path for path in CHALLENGE_DATA_DIR.iterdir() if path.is_dir())
     if not scenarios:
         raise FileNotFoundError(f"No scenario directories found under {CHALLENGE_DATA_DIR}")
+
+    logging.info(f"{len(scenarios)} scenarios is loaded for the test of Task {TASK_ID}")
+
     return scenarios
 
 
@@ -66,6 +75,9 @@ def frame_ids(scenario_dir):
             f"No complete frames found under {scenario_dir}. "
             "Expected matching Numerical/*.json and Stereo Left/<frame_id> entries."
         )
+    
+    logging.info(f"{len(ids)} instances is loaded for the test of Task {TASK_ID}")
+
     return ids
 
 
@@ -121,6 +133,7 @@ def validate_prediction(prediction, case_id):
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
     output_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/app/output")
     submission_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("/app/ingested_program")

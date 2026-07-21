@@ -1,4 +1,5 @@
 import json
+import logging
 import math
 import sys
 from pathlib import Path
@@ -74,6 +75,8 @@ def auc_from_errors(errors, max_threshold=MAX_THRESHOLD_PX):
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+
     input_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/app/input")
     output_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("/app/output")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -86,6 +89,8 @@ def main():
         case_ids = sorted(predictions.keys())
         if not case_ids:
             raise ValueError("predictions.json is empty")
+
+        logging.info(f"{len(case_ids)} predictions is loaded for the scoring of Task 1")
 
         keypoint_errors = []
         distance_errors = []
@@ -100,6 +105,11 @@ def main():
         keypoint_auc = auc_from_errors(keypoint_errors, MAX_THRESHOLD_PX)
         distance_auc = auc_from_errors(distance_errors, MAX_THRESHOLD_DIST)
         final_score = KEYPOINT_WEIGHT * keypoint_auc + DISTANCE_WEIGHT * distance_auc
+
+        logging.info(
+            f"Scoring of Task 1 is done: keypoint_auc={keypoint_auc}, "
+            f"distance_auc={distance_auc}, final_score={final_score}"
+        )
 
         scores = {
             "final_score": round(final_score, 6),
