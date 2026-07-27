@@ -60,10 +60,10 @@ def load_duration(input_dir):
     try:
         durations_path = find_file(input_dir, "durations.json")
     except FileNotFoundError:
-        return -1
+        return -1, []
     with durations_path.open() as handle:
         data = json.load(handle)
-    return data.get("total_seconds", -1)
+    return data.get("total_seconds", -1), data.get("timed_out_cases", [])
 
 
 def auc_from_errors(errors, max_threshold=MAX_THRESHOLD_PX):
@@ -255,21 +255,33 @@ def main():
             pred_dist = predictions[case_id]["tool_tissue_distance"]
             distance_errors.append(abs(pred_dist - ref_dist))
 
+        # Timed-out cases are penalised with an error beyond the max threshold
+        # so the AUC denominator is always the total number of cases, not just
+        # the ones that finished within the time limit.
+        duration, timed_out_cases = load_duration(input_dir)
+        PENALTY_ERROR = max(MAX_THRESHOLD_PX, MAX_THRESHOLD_DIST) + 1  # fails every threshold
+        keypoint_errors.extend([PENALTY_ERROR] * len(timed_out_cases))
+        distance_errors.extend([PENALTY_ERROR] * len(timed_out_cases))
+        total_cases = len(keypoint_errors)
+
         keypoint_auc = auc_from_errors(keypoint_errors, MAX_THRESHOLD_PX)
         distance_auc = auc_from_errors(distance_errors, MAX_THRESHOLD_DIST)
         final_score = KEYPOINT_WEIGHT * keypoint_auc + DISTANCE_WEIGHT * distance_auc
 
         logging.info(
             f"Scoring of Task 1 is done: keypoint_auc={keypoint_auc}, "
-            f"distance_auc={distance_auc}, final_score={final_score}"
+            f"distance_auc={distance_auc}, final_score={final_score} "
+            f"({len(case_ids)} predictions + {len(timed_out_cases)} timed-out penalties)"
         )
 
         scores = {
             "final_score": round(final_score, 6),
+            "task1_score": round(final_score, 6),
             "keypoint_auc": round(keypoint_auc, 6),
             "distance_auc": round(distance_auc, 6),
-            "duration": load_duration(input_dir),
-            "num_cases": len(case_ids),
+            "duration": duration,
+            "num_cases": total_cases,
+            "timed_out": len(timed_out_cases),
             "cuda_available": int(cuda_available()),
         }
     except Exception as exc:

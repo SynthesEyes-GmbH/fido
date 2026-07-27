@@ -82,10 +82,10 @@ def load_duration(input_dir):
     try:
         durations_path = find_file(input_dir, "durations.json")
     except FileNotFoundError:
-        return -1
+        return -1, []
     with durations_path.open() as handle:
         data = json.load(handle)
-    return data.get("total_seconds", -1)
+    return data.get("total_seconds", -1), data.get("timed_out_cases", [])
 
 
 def auc_from_errors(errors, max_threshold=MAX_THRESHOLD_PX):
@@ -266,14 +266,25 @@ def main():
             pred_corners = project_corners(pred_H)
             errors.append(corner_error(pred_corners, ref_corners))
 
+        # Timed-out cases are penalised with an error beyond the max threshold
+        # so the AUC denominator is always the total number of cases, not just
+        # the ones that finished within the time limit.
+        duration, timed_out_cases = load_duration(input_dir)
+        PENALTY_ERROR = MAX_THRESHOLD_PX + 1  # fails every threshold → 0 accuracy
+        errors.extend([PENALTY_ERROR] * len(timed_out_cases))
+        total_cases = len(errors)
+
         score = auc_from_errors(errors)
 
-        logging.info(f"Scoring of Task 2 is done: final_score={score}")
+        logging.info(f"Scoring of Task 2 is done: final_score={score} "
+                     f"({len(case_ids)} predictions + {len(timed_out_cases)} timed-out penalties)")
 
         scores = {
             "final_score": round(score, 6),
-            "duration": load_duration(input_dir),
-            "num_cases": len(case_ids),
+            "task2_score": round(score, 6),
+            "duration": duration,
+            "num_cases": total_cases,
+            "timed_out": len(timed_out_cases),
             "cuda_available": int(cuda_available()),
         }
     except Exception as exc:
