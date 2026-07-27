@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+
 import logging
 
 
@@ -153,16 +154,6 @@ def validate_prediction(prediction, test_id):
 def main():
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
-    # Log GPU availability so it is visible in submission logs
-    try:
-        import torch
-        cuda_available = torch.cuda.is_available()
-        device_count = torch.cuda.device_count()
-        device_name = torch.cuda.get_device_name(0) if cuda_available else "N/A"
-        logging.info(f"CUDA available: {cuda_available} | Devices: {device_count} | GPU: {device_name}")
-    except Exception as exc:
-        logging.warning(f"Could not check CUDA availability: {exc}")
-
     output_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/app/output")
     submission_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("/app/ingested_program")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -177,6 +168,22 @@ def main():
         raise
 
     model = module.load_model(str(submission_dir / f"model_{TASK_ID}.pth"))
+
+    # ---- Warmup phase -------------------------------------------------------
+    # Run 10 inference calls on the first available case before timing begins.
+    # This primes CUDA kernels and any JIT compilation so measured latency
+    # reflects steady-state performance, not cold-start overhead.
+    NUM_WARMUP = 10
+    warmup_cases = selected_cases()
+    if warmup_cases:
+        warmup_scenario_dir, warmup_frame_id = warmup_cases[0]
+        warmup_oct = load_oct_volume(warmup_scenario_dir, warmup_frame_id)
+        warmup_opmi = load_opmi_image(warmup_scenario_dir, warmup_frame_id)
+        logging.info(f"Running {NUM_WARMUP} warmup inference calls...")
+        for _ in range(NUM_WARMUP):
+            module.inference(TASK_ID, warmup_oct, warmup_opmi, model)
+        logging.info("Warmup complete.")
+    # -------------------------------------------------------------------------
 
     predictions = {}
     case_durations = {}
