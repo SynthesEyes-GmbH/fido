@@ -8,17 +8,16 @@ The dataset is released under **CC BY-NC-ND** (Attribution-NonCommercial-NoDeriv
 
 | Award | Amount |
 |---|---|
-| Best performing team — Task 1 (Keypoint Detection) | ~€350 (Subject to Change) |
-| Best performing team — Task 2 (Registration) | ~€350 (Subject to Change) |
-| Most innovative/impactful approach | ~€350 (Subject to Change) | 
+| Best performing team — Task 1 (Keypoint Detection) | t.b.a. |
+| Best performing team — Task 2 (Registration) | t.b.a. |
+| Most innovative/impactful approach | t.b.a. | 
 
-The top-performing team per task is determined by the quantitative leaderboard. The most innovative/impactful approach is selected by the organizing committee. A single team may win both awards for the same task.
+The top-performing team per task is determined by the quantitative leaderboard. The most innovative/impactful approach is selected by the organizing committee. A single team may win multiple awards.
 
 ## Participation
 
-- Submissions must be fully automatic (no human-in-the-loop at inference).
-- Teams from organizer institutes (SynthesEyes GmbH, Carl Zeiss AG/Meditec AG, TU Munich, Rotterdam Eye Hospital) may participate but are **not eligible for awards** and will not appear on the leaderboard.
-- Each team may submit only once to the final test evaluation per task.
+- Submissions are fully automatic (no human-in-the-loop at inference).
+- Teams from organizer institutes (SynthesEyes GmbH, Carl Zeiss AG/Meditec AG, TU Munich, Rotterdam Eye Hospital) may participate but are **not eligible for awards**.
 
 ## Data Usage
 
