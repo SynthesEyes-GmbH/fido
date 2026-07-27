@@ -1,3 +1,4 @@
+import html
 import json
 import logging
 import math
@@ -97,6 +98,45 @@ def auc_from_errors(errors, max_threshold=MAX_THRESHOLD_PX):
     return total / (max_threshold + 1)
 
 
+def write_detailed_results(output_dir, scores):
+    """Writes detailed_results.html, shown on the Codabench submission page."""
+    error = scores.get("error")
+    if error:
+        body = (
+            '<p class="bad"><strong>This submission did not produce a score.</strong></p>'
+            f"<p>{html.escape(str(error))}</p>"
+            "<p>Check the ingestion logs on this page for the underlying cause. "
+            "A crash during inference means no predictions were written, "
+            "which scores 0.</p>"
+        )
+    else:
+        rows = "".join(
+            f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(scores[key]))}</td></tr>"
+            for label, key in (
+                ("Final score", "final_score"),
+                ("Cases evaluated", "num_cases"),
+                ("Total inference time (s)", "duration"),
+                ("CUDA available", "cuda_available"),
+            )
+            if key in scores
+        )
+        body = f"<table>{rows}</table>"
+
+    document = (
+        "<html><head><meta charset='utf-8'><style>"
+        "body{font-family:sans-serif;margin:1rem;}"
+        "table{border-collapse:collapse;}"
+        "td{border:1px solid #ccc;padding:6px 12px;}"
+        "tr td:first-child{font-weight:600;}"
+        ".bad{color:#b00020;}"
+        "</style></head><body>"
+        "<h2>Task 2 &mdash; Registration</h2>"
+        f"{body}</body></html>"
+    )
+
+    (output_dir / "detailed_results.html").write_text(document, encoding="utf-8")
+
+
 def main():
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
@@ -142,6 +182,8 @@ def main():
             "cuda_available": int(cuda_available()),
             "error": str(exc),
         }
+
+    write_detailed_results(output_dir, scores)
 
     with (output_dir / "scores.json").open("w") as handle:
         json.dump(scores, handle)

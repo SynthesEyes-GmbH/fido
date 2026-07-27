@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import random
 import subprocess
 import sys
 import time
@@ -17,6 +18,8 @@ TASK_ID = 1
 CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Task 2"
 REQUIRED_FILES = {"inference.py", "model_1.pth"}
 PER_CASE_TIME_LIMIT_SECONDS = 20
+RANDOM_SEED = 2026
+NUM_EVAL_CASES = 100
 
 
 def install_requirements(submission_dir):
@@ -57,9 +60,7 @@ def scenario_dirs():
 
     scenarios = sorted(path for path in CHALLENGE_DATA_DIR.iterdir() if path.is_dir())
     if not scenarios:
-        raise FileNotFoundError(f"No scenario directories found under {CHALLENGE_DATA_DIR}")
-
-    logging.info(f"{len(scenarios)} scenarios is loaded for the test of Task {TASK_ID}")
+        raise FileNotFoundError("No scenario directories found in the test data")
 
     return scenarios
 
@@ -72,13 +73,37 @@ def frame_ids(scenario_dir):
     ids = sorted(numerical_ids & stereo_ids)
     if not ids:
         raise FileNotFoundError(
-            f"No complete frames found under {scenario_dir}. "
+            "No complete frames found in the test data. "
             "Expected matching Numerical/*.json and Stereo Left/<frame_id> entries."
         )
 
-    logging.info(f"{len(ids)} instances is loaded for the test of Task {TASK_ID}")
-
     return ids
+
+
+def selected_cases():
+    """Returns a fixed, deterministic subset of (scenario_dir, frame_id) cases.
+
+    The full case list is built across every scenario and sorted before sampling,
+    so the selection depends only on the case ids themselves -- not on directory
+    iteration order -- and a given dataset always yields the same NUM_EVAL_CASES.
+    """
+    cases = []
+    for scenario_dir in scenario_dirs():
+        for frame_id in frame_ids(scenario_dir):
+            cases.append((scenario_dir, frame_id))
+
+    cases.sort(key=lambda case: f"{case[0].name}_{case[1]}")
+
+    if len(cases) <= NUM_EVAL_CASES:
+        logging.info(f"Evaluating {len(cases)} cases.")
+        return cases
+
+    selected = random.Random(RANDOM_SEED).sample(cases, NUM_EVAL_CASES)
+    selected.sort(key=lambda case: f"{case[0].name}_{case[1]}")
+
+    logging.info(f"Evaluating a fixed subset of {len(selected)} cases.")
+
+    return selected
 
 
 def load_oct_volume(scenario_dir, frame_id):
@@ -101,11 +126,12 @@ def load_opmi_image(scenario_dir, frame_id):
         return np.array(image.convert("RGB"))
 
 
-def validate_prediction(prediction, case_id):
+def validate_prediction(prediction, test_id):
     arr = np.asarray(prediction, dtype=np.float64)
     if arr.shape != (3, 3):
         raise ValueError(
-            f"Prediction for {case_id} must be a (3, 3) homography matrix, got shape {arr.shape}"
+            f"Prediction for test {test_id} must be a (3, 3) homography matrix, "
+            f"got shape {arr.shape}"
         )
     return arr.tolist()
 
@@ -125,22 +151,22 @@ def main():
     timed_out_cases = []
     total_start = time.monotonic()
 
-    for scenario_dir in scenario_dirs():
-        for frame_id in frame_ids(scenario_dir):
-            case_id = f"{scenario_dir.name}_{frame_id}"
-            oct_volume = load_oct_volume(scenario_dir, frame_id)
-            opmi_image = load_opmi_image(scenario_dir, frame_id)
+    for test_id, (scenario_dir, frame_id) in enumerate(selected_cases()):
+        case_id = f"{scenario_dir.name}_{frame_id}"
+        oct_volume = load_oct_volume(scenario_dir, frame_id)
+        opmi_image = load_opmi_image(scenario_dir, frame_id)
 
-            case_start = time.monotonic()
-            prediction = module.inference(TASK_ID, oct_volume, opmi_image, model)
-            elapsed = time.monotonic() - case_start
-            case_durations[case_id] = elapsed
+        case_start = time.monotonic()
+        prediction = module.inference(TASK_ID, oct_volume, opmi_image, model)
+        elapsed = time.monotonic() - case_start
+        case_durations[test_id] = elapsed
 
-            if elapsed > PER_CASE_TIME_LIMIT_SECONDS:
-                timed_out_cases.append(case_id)
-                continue
+        if elapsed > PER_CASE_TIME_LIMIT_SECONDS:
+            logging.info(f"Test {test_id} exceeded the per-case time limit and was skipped.")
+            timed_out_cases.append(test_id)
+            continue
 
-            predictions[case_id] = validate_prediction(prediction, case_id)
+        predictions[case_id] = validate_prediction(prediction, test_id)
 
     total_elapsed = time.monotonic() - total_start
 

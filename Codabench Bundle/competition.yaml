@@ -6,7 +6,7 @@ description: The FIDO Challenge focuses on multimodal AI-driven decision-support
 image: logo.jpg
 terms: terms.md
 registration_auto_approve: false
-docker_image: pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+docker_image: pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime
 queue: ...
 
 pages:
