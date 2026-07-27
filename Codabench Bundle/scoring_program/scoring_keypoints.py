@@ -90,47 +90,141 @@ def read_ingestion_error(input_dir):
 
 def write_detailed_results(output_dir, scores, ingestion_error=None):
     """Writes detailed_results.html, shown on the Codabench submission page."""
+
+    def badge(value, good_thresh=0.5, warn_thresh=0.2):
+        v = float(value)
+        if v >= good_thresh:
+            color, bg = "#1a7f37", "#d4edda"
+        elif v >= warn_thresh:
+            color, bg = "#856404", "#fff3cd"
+        else:
+            color, bg = "#721c24", "#f8d7da"
+        return (
+            f'<span style="background:{bg};color:{color};padding:2px 10px;'
+            f'border-radius:12px;font-weight:700;font-size:1.05em;">{v:.4f}</span>'
+        )
+
+    def pct_bar(value, max_val=1.0):
+        pct = min(max(float(value) / float(max_val), 0.0), 1.0) * 100
+        fill = "#1a7f37" if pct >= 50 else ("#d68910" if pct >= 20 else "#b00020")
+        return (
+            f'<div style="background:#e9ecef;border-radius:6px;height:14px;width:200px;display:inline-block;vertical-align:middle;">'
+            f'<div style="background:{fill};width:{pct:.1f}%;height:100%;border-radius:6px;"></div></div> '
+            f'<span style="font-size:0.85em;color:#555;">{pct:.1f}%</span>'
+        )
+
+    def row(label, value, bar=None):
+        bar_td = f'<td style="padding:8px 12px;border-bottom:1px solid #dee2e6;">{bar}</td>' if bar is not None else '<td style="padding:8px 12px;border-bottom:1px solid #dee2e6;"></td>'
+        return (
+            f'<tr><td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-weight:600;">{label}</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #dee2e6;">{value}</td>'
+            f'{bar_td}</tr>'
+        )
+
     error = scores.get("error")
+
     if error:
         detail = ingestion_error or error
         body = (
-            '<p class="bad"><strong>This submission did not produce a score.</strong></p>'
-            f"<p>{html.escape(str(detail))}</p>"
+            '<div style="background:#f8d7da;border:1px solid #f5c6cb;border-radius:6px;padding:12px 16px;margin-bottom:12px;">'
+            '<p style="margin:0 0 6px;color:#721c24;"><strong>&#10060; This submission did not produce a score.</strong></p>'
+            f'<p style="margin:0;color:#721c24;font-family:monospace;font-size:0.9em;">{html.escape(str(detail))}</p>'
+            '</div>'
         )
         if not ingestion_error:
             body += (
-                "<p>Check the ingestion logs on this page for the underlying cause. "
-                "A crash during inference means no predictions were written, "
-                "which scores 0.</p>"
+                '<p style="color:#555;font-size:0.9em;">'
+                'Check the ingestion logs on this page for the underlying cause. '
+                'A crash during inference means no predictions were written, which scores 0.</p>'
             )
     else:
-        rows = "".join(
-            f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(scores[key]))}</td></tr>"
-            for label, key in (
-                ("Final score", "final_score"),
-                ("Keypoint AUC", "keypoint_auc"),
-                ("Tool-tissue distance AUC", "distance_auc"),
-                ("Cases evaluated", "num_cases"),
-                ("Total inference time (s)", "duration"),
-                ("CUDA available", "cuda_available"),
-            )
-            if key in scores
+        final_score  = scores.get("final_score", 0)
+        kp_auc       = scores.get("keypoint_auc", 0)
+        dist_auc     = scores.get("distance_auc", 0)
+        num_cases    = scores.get("num_cases", 0)
+        duration     = scores.get("duration", -1)
+        cuda         = scores.get("cuda_available", 0)
+
+        cuda_badge = (
+            '<span style="background:#d4edda;color:#1a7f37;padding:2px 8px;border-radius:10px;font-size:0.85em;">&#9989; GPU</span>'
+            if cuda else
+            '<span style="background:#f8d7da;color:#721c24;padding:2px 8px;border-radius:10px;font-size:0.85em;">&#10060; CPU only</span>'
         )
-        body = f"<table>{rows}</table>"
+
+        duration_str = f"{duration:.1f} s" if duration >= 0 else "N/A"
+        if duration > 0 and num_cases > 0:
+            duration_str += f" &nbsp;&#x2022;&nbsp; {duration / num_cases:.2f} s / case"
+
+        body = (
+            # Score hero
+            '<div style="background:linear-gradient(135deg,#0d6efd11,#0dcaf011);'
+            'border:1px solid #b6d4fe;border-radius:10px;padding:16px 20px;margin-bottom:20px;">'
+            '<div style="font-size:0.8em;color:#555;text-transform:uppercase;letter-spacing:.05em;">Final Score (0&ndash;1)</div>'
+            f'<div style="font-size:2.4em;font-weight:800;margin:4px 0;">{badge(final_score)}</div>'
+            f'<div>{pct_bar(final_score)}</div>'
+            '<div style="font-size:0.78em;color:#777;margin-top:6px;">'
+            f'Weighted combination: {KEYPOINT_WEIGHT}&times;Keypoint AUC + {DISTANCE_WEIGHT}&times;Distance AUC. Higher is better.</div>'
+            '</div>'
+
+            # Sub-score cards
+            '<div style="display:flex;gap:12px;margin-bottom:20px;">'
+
+            '<div style="flex:1;border:1px solid #dee2e6;border-radius:8px;padding:12px 16px;">'
+            '<div style="font-size:0.75em;color:#555;text-transform:uppercase;letter-spacing:.05em;">Keypoint AUC</div>'
+            f'<div style="font-size:1.6em;font-weight:700;margin:4px 0;">{badge(kp_auc)}</div>'
+            f'<div>{pct_bar(kp_auc)}</div>'
+            f'<div style="font-size:0.75em;color:#888;margin-top:4px;">Weight: {KEYPOINT_WEIGHT}</div>'
+            '</div>'
+
+            '<div style="flex:1;border:1px solid #dee2e6;border-radius:8px;padding:12px 16px;">'
+            '<div style="font-size:0.75em;color:#555;text-transform:uppercase;letter-spacing:.05em;">Distance AUC</div>'
+            f'<div style="font-size:1.6em;font-weight:700;margin:4px 0;">{badge(dist_auc)}</div>'
+            f'<div>{pct_bar(dist_auc)}</div>'
+            f'<div style="font-size:0.75em;color:#888;margin-top:4px;">Weight: {DISTANCE_WEIGHT}</div>'
+            '</div>'
+            '</div>'
+
+            # Details table
+            '<table style="border-collapse:collapse;width:100%;margin-bottom:16px;">'
+            '<thead><tr style="background:#f1f3f5;">'
+            '<th style="text-align:left;padding:8px 12px;font-size:0.8em;color:#555;border-bottom:2px solid #dee2e6;">Metric</th>'
+            '<th style="text-align:left;padding:8px 12px;font-size:0.8em;color:#555;border-bottom:2px solid #dee2e6;">Value</th>'
+            '<th style="text-align:left;padding:8px 12px;font-size:0.8em;color:#555;border-bottom:2px solid #dee2e6;">Visualisation</th>'
+            '</tr></thead><tbody>'
+            + row("Keypoint AUC",       f"{kp_auc:.6f}",   pct_bar(kp_auc))
+            + row("Distance AUC",       f"{dist_auc:.6f}",  pct_bar(dist_auc))
+            + row("Final score",        f"{final_score:.6f}", pct_bar(final_score))
+            + row("Cases evaluated",    str(num_cases))
+            + row("Inference time",     duration_str)
+            + f'<tr><td style="padding:8px 12px;font-weight:600;">Hardware</td>'
+              f'<td style="padding:8px 12px;" colspan="2">{cuda_badge}</td></tr>'
+            + '</tbody></table>'
+
+            # Explainer
+            '<details style="border:1px solid #dee2e6;border-radius:6px;padding:10px 14px;">'
+            '<summary style="cursor:pointer;font-weight:600;font-size:0.9em;">How is the score computed?</summary>'
+            '<p style="margin:10px 0 0;font-size:0.85em;color:#444;">'
+            '<strong>Keypoint AUC</strong>: L2 pixel distance between predicted and ground-truth tool-tip keypoint. '
+            'AUC at thresholds 0&ndash;10 px. '
+            '<strong>Distance AUC</strong>: absolute error of the predicted tool-tissue distance vs ground truth (B-scan pixels). '
+            'AUC at thresholds 0&ndash;10 px. '
+            f'<strong>Final score</strong> = {KEYPOINT_WEIGHT}&times;Keypoint AUC + {DISTANCE_WEIGHT}&times;Distance AUC. '
+            'AUC = 1.0 means all predictions are within every threshold &mdash; a perfect submission.</p>'
+            '</details>'
+        )
 
     document = (
         "<html><head><meta charset='utf-8'><style>"
-        "body{font-family:sans-serif;margin:1rem;}"
-        "table{border-collapse:collapse;}"
-        "td{border:1px solid #ccc;padding:6px 12px;}"
-        "tr td:first-child{font-weight:600;}"
-        ".bad{color:#b00020;}"
+        "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
+        "margin:1.2rem;color:#212529;font-size:14px;}"
+        "h2{margin-top:0;color:#0d6efd;font-size:1.3em;}"
         "</style></head><body>"
         "<h2>Task 1 &mdash; Keypoints &amp; Tool-Tissue Distance</h2>"
         f"{body}</body></html>"
     )
 
     (output_dir / "detailed_results.html").write_text(document, encoding="utf-8")
+
 
 
 def main():

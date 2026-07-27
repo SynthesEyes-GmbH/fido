@@ -113,41 +113,126 @@ def read_ingestion_error(input_dir):
 
 def write_detailed_results(output_dir, scores, ingestion_error=None):
     """Writes detailed_results.html, shown on the Codabench submission page."""
+
+    def badge(value, good_thresh=0.5, warn_thresh=0.2):
+        """Return a colored badge span for a 0–1 score value."""
+        v = float(value)
+        if v >= good_thresh:
+            color, bg = "#1a7f37", "#d4edda"
+        elif v >= warn_thresh:
+            color, bg = "#856404", "#fff3cd"
+        else:
+            color, bg = "#721c24", "#f8d7da"
+        return (
+            f'<span style="background:{bg};color:{color};padding:2px 10px;'
+            f'border-radius:12px;font-weight:700;font-size:1.05em;">{v:.4f}</span>'
+        )
+
+    def pct_bar(value, max_val=1.0):
+        """Return an inline SVG-style progress bar."""
+        pct = min(max(float(value) / float(max_val), 0.0), 1.0) * 100
+        if pct >= 50:
+            fill = "#1a7f37"
+        elif pct >= 20:
+            fill = "#d68910"
+        else:
+            fill = "#b00020"
+        return (
+            f'<div style="background:#e9ecef;border-radius:6px;height:14px;width:200px;display:inline-block;vertical-align:middle;">'
+            f'<div style="background:{fill};width:{pct:.1f}%;height:100%;border-radius:6px;"></div></div> '
+            f'<span style="font-size:0.85em;color:#555;">{pct:.1f}%</span>'
+        )
+
     error = scores.get("error")
+
     if error:
         detail = ingestion_error or error
         body = (
-            '<p class="bad"><strong>This submission did not produce a score.</strong></p>'
-            f"<p>{html.escape(str(detail))}</p>"
+            '<div style="background:#f8d7da;border:1px solid #f5c6cb;border-radius:6px;padding:12px 16px;margin-bottom:12px;">'
+            '<p style="margin:0 0 6px;color:#721c24;"><strong>&#10060; This submission did not produce a score.</strong></p>'
+            f'<p style="margin:0;color:#721c24;font-family:monospace;font-size:0.9em;">{html.escape(str(detail))}</p>'
+            '</div>'
         )
         if not ingestion_error:
             body += (
-                "<p>Check the ingestion logs on this page for the underlying cause. "
-                "A crash during inference means no predictions were written, "
-                "which scores 0.</p>"
+                '<p style="color:#555;font-size:0.9em;">'
+                'Check the ingestion logs on this page for the underlying cause. '
+                'A crash during inference means no predictions were written, which scores 0.</p>'
             )
     else:
-        rows = "".join(
-            f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(scores[key]))}</td></tr>"
-            for label, key in (
-                ("Final score", "final_score"),
-                ("Cases evaluated", "num_cases"),
-                ("Total inference time (s)", "duration"),
-                ("CUDA available", "cuda_available"),
-            )
-            if key in scores
+        final_score = scores.get("final_score", 0)
+        num_cases = scores.get("num_cases", 0)
+        duration = scores.get("duration", -1)
+        cuda = scores.get("cuda_available", 0)
+        corner_errs_mean = scores.get("mean_corner_error_px")
+
+        cuda_badge = (
+            '<span style="background:#d4edda;color:#1a7f37;padding:2px 8px;border-radius:10px;font-size:0.85em;">&#9989; GPU</span>'
+            if cuda else
+            '<span style="background:#f8d7da;color:#721c24;padding:2px 8px;border-radius:10px;font-size:0.85em;">&#10060; CPU only</span>'
         )
-        body = f"<table>{rows}</table>"
+
+        duration_str = f"{duration:.1f} s" if duration >= 0 else "N/A"
+        if duration > 0 and num_cases > 0:
+            per_case = duration / num_cases
+            duration_str += f" &nbsp;&#x2022;&nbsp; {per_case:.2f} s / case"
+
+        body = (
+            # Score hero
+            '<div style="background:linear-gradient(135deg,#0d6efd11,#0dcaf011);'
+            'border:1px solid #b6d4fe;border-radius:10px;padding:16px 20px;margin-bottom:20px;">'
+            '<div style="font-size:0.8em;color:#555;text-transform:uppercase;letter-spacing:.05em;">AUC Score (0–1)</div>'
+            f'<div style="font-size:2.4em;font-weight:800;margin:4px 0;">{badge(final_score)}</div>'
+            f'<div>{pct_bar(final_score)}</div>'
+            '<div style="font-size:0.78em;color:#777;margin-top:6px;">'
+            'Area Under the Corner Error Curve at thresholds 0&ndash;10 px. Higher is better.</div>'
+            '</div>'
+
+            # Metrics table
+            '<table style="border-collapse:collapse;width:100%;margin-bottom:16px;">'
+            '<thead><tr style="background:#f1f3f5;">'
+            '<th style="text-align:left;padding:8px 12px;font-size:0.8em;color:#555;border-bottom:2px solid #dee2e6;">Metric</th>'
+            '<th style="text-align:left;padding:8px 12px;font-size:0.8em;color:#555;border-bottom:2px solid #dee2e6;">Value</th>'
+            '<th style="text-align:left;padding:8px 12px;font-size:0.8em;color:#555;border-bottom:2px solid #dee2e6;">Visualisation</th>'
+            '</tr></thead><tbody>'
+            f'<tr><td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-weight:600;">Corner Error AUC</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #dee2e6;">{final_score:.6f}</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #dee2e6;">{pct_bar(final_score)}</td></tr>'
+        )
+        if corner_errs_mean is not None:
+            body += (
+                f'<tr><td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-weight:600;">Mean corner error</td>'
+                f'<td style="padding:8px 12px;border-bottom:1px solid #dee2e6;">{corner_errs_mean:.2f} px</td>'
+                f'<td style="padding:8px 12px;border-bottom:1px solid #dee2e6;"></td></tr>'
+            )
+        body += (
+            f'<tr><td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-weight:600;">Cases evaluated</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #dee2e6;" colspan="2">{num_cases}</td></tr>'
+            f'<tr><td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-weight:600;">Inference time</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #dee2e6;" colspan="2">{duration_str}</td></tr>'
+            f'<tr><td style="padding:8px 12px;font-weight:600;">Hardware</td>'
+            f'<td style="padding:8px 12px;" colspan="2">{cuda_badge}</td></tr>'
+            '</tbody></table>'
+
+            # Explainer
+            '<details style="border:1px solid #dee2e6;border-radius:6px;padding:10px 14px;">'
+            '<summary style="cursor:pointer;font-weight:600;font-size:0.9em;">How is the score computed?</summary>'
+            '<p style="margin:10px 0 0;font-size:0.85em;color:#444;">'
+            'The predicted 3&times;3 homography <em>H</em> is used to project the four corners of the '
+            'canonical unit square. The mean L2 distance between predicted and ground-truth corners gives the '
+            '<strong>corner error</strong> (in pixels). The '
+            '<strong>AUC</strong> is the area under the accuracy-vs-threshold curve at integer thresholds '
+            '0&ndash;10 px, normalised to [0, 1]. A perfect prediction gives AUC = 1.0.</p>'
+            '</details>'
+        )
 
     document = (
         "<html><head><meta charset='utf-8'><style>"
-        "body{font-family:sans-serif;margin:1rem;}"
-        "table{border-collapse:collapse;}"
-        "td{border:1px solid #ccc;padding:6px 12px;}"
-        "tr td:first-child{font-weight:600;}"
-        ".bad{color:#b00020;}"
+        "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
+        "margin:1.2rem;color:#212529;font-size:14px;}"
+        "h2{margin-top:0;color:#0d6efd;font-size:1.3em;}"
         "</style></head><body>"
-        "<h2>Task 2 &mdash; Registration</h2>"
+        "<h2>Task 2 &mdash; iOCT&ndash;to&ndash;Fundus Registration</h2>"
         f"{body}</body></html>"
     )
 
