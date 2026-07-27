@@ -98,17 +98,34 @@ def auc_from_errors(errors, max_threshold=MAX_THRESHOLD_PX):
     return total / (max_threshold + 1)
 
 
-def write_detailed_results(output_dir, scores):
+def read_ingestion_error(input_dir):
+    """Returns the message ingestion recorded for a missing-files failure, if any."""
+    try:
+        error_path = find_file(input_dir, "ingestion_error.json")
+    except Exception:
+        return None
+    try:
+        with error_path.open() as handle:
+            return json.load(handle).get("error")
+    except Exception:
+        return None
+
+
+def write_detailed_results(output_dir, scores, ingestion_error=None):
     """Writes detailed_results.html, shown on the Codabench submission page."""
     error = scores.get("error")
     if error:
+        detail = ingestion_error or error
         body = (
             '<p class="bad"><strong>This submission did not produce a score.</strong></p>'
-            f"<p>{html.escape(str(error))}</p>"
-            "<p>Check the ingestion logs on this page for the underlying cause. "
-            "A crash during inference means no predictions were written, "
-            "which scores 0.</p>"
+            f"<p>{html.escape(str(detail))}</p>"
         )
+        if not ingestion_error:
+            body += (
+                "<p>Check the ingestion logs on this page for the underlying cause. "
+                "A crash during inference means no predictions were written, "
+                "which scores 0.</p>"
+            )
     else:
         rows = "".join(
             f"<tr><td>{html.escape(label)}</td><td>{html.escape(str(scores[key]))}</td></tr>"
@@ -183,7 +200,7 @@ def main():
             "error": str(exc),
         }
 
-    write_detailed_results(output_dir, scores)
+    write_detailed_results(output_dir, scores, read_ingestion_error(input_dir))
 
     with (output_dir / "scores.json").open("w") as handle:
         json.dump(scores, handle)

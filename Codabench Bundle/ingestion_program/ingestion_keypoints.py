@@ -33,6 +33,10 @@ def install_requirements(submission_dir):
     )
 
 
+class MissingSubmissionFiles(Exception):
+    """Raised when the submission archive lacks a required file."""
+
+
 def load_submission_module(submission_dir):
 
     logging.info(f"{submission_dir} is created for this submission.")
@@ -41,7 +45,18 @@ def load_submission_module(submission_dir):
     entries = {path.name for path in submission_dir.iterdir() if path.is_file()}
     missing = REQUIRED_FILES - entries
     if missing:
-        raise ValueError(f"Submission is missing required files: {sorted(missing)}")
+        message = f"Submission is missing required files: {sorted(missing)}"
+        nested = sorted(
+            path.name
+            for path in submission_dir.iterdir()
+            if path.is_dir() and not (REQUIRED_FILES - {item.name for item in path.iterdir() if item.is_file()})
+        )
+        if nested:
+            message += (
+                f". The required files were found inside the folder '{nested[0]}' instead. "
+                "Zip the files themselves, not the folder containing them."
+            )
+        raise MissingSubmissionFiles(message)
 
     install_requirements(submission_dir)
     sys.path.insert(0, str(submission_dir))
@@ -183,7 +198,15 @@ def main():
     submission_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("/app/ingested_program")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    module = load_submission_module(submission_dir)
+    try:
+        module = load_submission_module(submission_dir)
+    except MissingSubmissionFiles as exc:
+        # Recorded so the scoring program can show this on the submission page.
+        # Only this check is reported; any other failure is left to the logs.
+        with (output_dir / "ingestion_error.json").open("w") as handle:
+            json.dump({"error": str(exc)}, handle)
+        raise
+
     model = module.load_model(str(submission_dir / f"model_{TASK_ID}.pth"))
 
     predictions = {}
