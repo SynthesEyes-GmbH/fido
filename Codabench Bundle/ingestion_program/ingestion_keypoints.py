@@ -4,6 +4,7 @@ import random
 import subprocess
 import sys
 import time
+import traceback
 from pathlib import Path
 
 import numpy as np
@@ -69,6 +70,7 @@ def load_submission_module(submission_dir):
         raise AttributeError("inference.py must define load_model(model_path)")
     if not hasattr(module, "inference"):
         raise AttributeError("inference.py must define inference(task_id, oct_volume, opmi_image, model)")
+        raise AttributeError("inference.py must define inference(task_id, oct_volume, opmi_image, model). Note: The documentation may show a different signature; this one is correct.")
     return module
 
 
@@ -173,6 +175,7 @@ def validate_point(value):
 def validate_prediction(prediction, test_id):
     if not isinstance(prediction, dict):
         raise ValueError(f"Prediction for test {test_id} must be a dictionary")
+        raise TypeError(f"Prediction for test {test_id} must be a dictionary, got {type(prediction)}")
 
     if "keypoints" not in prediction:
         raise ValueError(f"Prediction for test {test_id} missing 'keypoints'")
@@ -182,6 +185,7 @@ def validate_prediction(prediction, test_id):
     kps = prediction["keypoints"]
     if not isinstance(kps, list) or len(kps) != 2:
         raise ValueError(f"keypoints for test {test_id} must be a list of length 2")
+        raise TypeError(f"keypoints for test {test_id} must be a list of length 2, got {type(kps)}")
 
     validated_kps = validate_point(kps)
 
@@ -200,75 +204,75 @@ def main():
 
     try:
         module = load_submission_module(submission_dir)
-    except MissingSubmissionFiles as exc:
-        # Recorded so the scoring program can show this on the submission page.
-        # Only this check is reported; any other failure is left to the logs.
+
+        model = module.load_model(str(submission_dir / f"model_{TASK_ID}.pth"))
+
+        # ---- Warmup phase -----------------------------------------------------
+        # Run 10 inference calls on the first available case before timing begins.
+        # This primes CUDA kernels and any JIT compilation so measured latency
+        # reflects steady-state performance, not cold-start overhead.
+        NUM_WARMUP = 10
+        warmup_cases = selected_cases()
+        if warmup_cases:
+            warmup_scenario_dir, warmup_frame_id = warmup_cases[0]
+            warmup_oct = load_oct_volume(warmup_scenario_dir, warmup_frame_id)
+            warmup_opmi = load_opmi_image(warmup_scenario_dir, warmup_frame_id)
+            logging.info(f"Running {NUM_WARMUP} warmup inference calls...")
+            for _ in range(NUM_WARMUP):
+                module.inference(TASK_ID, warmup_oct, warmup_opmi, model)
+            logging.info("Warmup complete.")
+        # -------------------------------------------------------------------------
+
+        predictions = {}
+        case_durations = {}
+        timed_out_cases = []
+        total_start = time.monotonic()
+
+        cases = selected_cases()
+        dropped_oct_cases = oct_dropout_cases(cases)
+
+        for test_id, (scenario_dir, frame_id) in enumerate(cases):
+            case_id = f"{scenario_dir.name}_{frame_id}"
+            if case_id in dropped_oct_cases:
+                oct_volume = None
+            else:
+                oct_volume = load_oct_volume(scenario_dir, frame_id)
+            opmi_image = load_opmi_image(scenario_dir, frame_id)
+
+            case_start = time.monotonic()
+            prediction = module.inference(TASK_ID, oct_volume, opmi_image, model)
+            elapsed = time.monotonic() - case_start
+            case_durations[test_id] = elapsed
+
+            if elapsed > PER_CASE_TIME_LIMIT_SECONDS:
+                logging.info(f"Test {test_id} exceeded the per-case time limit and was skipped.")
+                timed_out_cases.append(test_id)
+                continue
+
+            predictions[case_id] = validate_prediction(prediction, test_id)
+
+        total_elapsed = time.monotonic() - total_start
+
+        with (output_dir / "predictions.json").open("w") as handle:
+            json.dump(predictions, handle)
+
+        with (output_dir / "durations.json").open("w") as handle:
+            json.dump(
+                {
+                    "total_seconds": total_elapsed,
+                    "per_case_seconds": case_durations,
+                    "timed_out_cases": timed_out_cases,
+                    "per_case_time_limit_seconds": PER_CASE_TIME_LIMIT_SECONDS,
+                },
+                handle,
+            )
+    except Exception as exc:
+        # Recorded so the scoring program can show this on the submission page,
+        # in addition to the full traceback that goes to the ingestion logs.
+        logging.error("Ingestion failed:\n%s", traceback.format_exc())
         with (output_dir / "ingestion_error.json").open("w") as handle:
-            json.dump({"error": str(exc)}, handle)
+            json.dump({"error": str(exc) or type(exc).__name__}, handle)
         raise
-
-    model = module.load_model(str(submission_dir / f"model_{TASK_ID}.pth"))
-
-    # ---- Warmup phase -------------------------------------------------------
-    # Run 10 inference calls on the first available case before timing begins.
-    # This primes CUDA kernels and any JIT compilation so measured latency
-    # reflects steady-state performance, not cold-start overhead.
-    NUM_WARMUP = 10
-    warmup_cases = selected_cases()
-    if warmup_cases:
-        warmup_scenario_dir, warmup_frame_id = warmup_cases[0]
-        warmup_oct = load_oct_volume(warmup_scenario_dir, warmup_frame_id)
-        warmup_opmi = load_opmi_image(warmup_scenario_dir, warmup_frame_id)
-        logging.info(f"Running {NUM_WARMUP} warmup inference calls...")
-        for _ in range(NUM_WARMUP):
-            module.inference(TASK_ID, warmup_oct, warmup_opmi, model)
-        logging.info("Warmup complete.")
-    # -------------------------------------------------------------------------
-
-    predictions = {}
-    case_durations = {}
-    timed_out_cases = []
-    total_start = time.monotonic()
-
-    cases = selected_cases()
-    dropped_oct_cases = oct_dropout_cases(cases)
-
-
-    for test_id, (scenario_dir, frame_id) in enumerate(cases):
-        case_id = f"{scenario_dir.name}_{frame_id}"
-        if case_id in dropped_oct_cases:
-            oct_volume = None
-        else:
-            oct_volume = load_oct_volume(scenario_dir, frame_id)
-        opmi_image = load_opmi_image(scenario_dir, frame_id)
-
-        case_start = time.monotonic()
-        prediction = module.inference(TASK_ID, oct_volume, opmi_image, model)
-        elapsed = time.monotonic() - case_start
-        case_durations[test_id] = elapsed
-
-        if elapsed > PER_CASE_TIME_LIMIT_SECONDS:
-            logging.info(f"Test {test_id} exceeded the per-case time limit and was skipped.")
-            timed_out_cases.append(test_id)
-            continue
-
-        predictions[case_id] = validate_prediction(prediction, test_id)
-
-    total_elapsed = time.monotonic() - total_start
-
-    with (output_dir / "predictions.json").open("w") as handle:
-        json.dump(predictions, handle)
-
-    with (output_dir / "durations.json").open("w") as handle:
-        json.dump(
-            {
-                "total_seconds": total_elapsed,
-                "per_case_seconds": case_durations,
-                "timed_out_cases": timed_out_cases,
-                "per_case_time_limit_seconds": PER_CASE_TIME_LIMIT_SECONDS,
-            },
-            handle,
-        )
 
 
 if __name__ == "__main__":

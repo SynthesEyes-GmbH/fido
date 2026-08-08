@@ -5,6 +5,7 @@ services:
     volumes:
       - ${HOST_DIRECTORY}:/codabench
       - ${DOCKER_SOCK}:/var/run/docker.sock
+      - ./compute_worker.py:/compute_worker.py:ro
     env_file:
       - .env
     restart: unless-stopped
