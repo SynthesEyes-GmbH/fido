@@ -8,18 +8,18 @@ from pathlib import Path
 
 CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Task 1"
 MAX_THRESHOLD_PX = 10
-MAX_THRESHOLD_DIST = 10
+MAX_THRESHOLD_DIST = 20
 KEYPOINT_WEIGHT = 0.7
 DISTANCE_WEIGHT = 0.3
 
-# Ground Truth.Task 1[2] is stored at 10x the true tool-tip-to-retina pixel
-# distance on the B-scan image (e.g. stored 613.7916 -> true 61.37916 px).
+# Ground Truth.Task 1[2] is stored at ~7.8x the true tool-tip-to-retina pixel
+# distance on the B-scan image (e.g. stored 613.7916 -> true 78.69 px).
 # tool_tissue_distance predictions are expected in true B-scan pixel units,
 # so the stored ground truth is divided by this factor before computing
 # error. This keeps distance_auc on the same pixel scale (and threshold) as
 # keypoint_auc, so the two are comparable before KEYPOINT_WEIGHT/DISTANCE_WEIGHT
 # are applied.
-GROUND_TRUTH_DISTANCE_SCALE = 10
+GROUND_TRUTH_DISTANCE_SCALE = (4.0 / 512) * 1000
 
 
 def cuda_available():
