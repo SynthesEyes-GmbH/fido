@@ -72,29 +72,24 @@ def _put_text(img, text, org, scale=0.65, color=(255, 255, 255), thickness=2):
     cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, scale, color,        thickness,     cv2.LINE_AA)
 
 
-def t1_draw(opmi_rgb, pred_x, pred_y, gt_x, gt_y, case_id,
-            kp_err, dist_err, kp_auc, dist_auc, case_auc):
+PRED_SQUARE_HALF = 15  # half-side of the hollow prediction square in px
+
+
+def t1_draw(opmi_rgb, pred_x, pred_y, gt_x, gt_y):
     bgr = cv2.cvtColor(opmi_rgb, cv2.COLOR_RGB2BGR)
 
+    # GT: crosshair + circle (green)
     gx, gy = int(round(gt_x)), int(round(gt_y))
     cv2.drawMarker(bgr, (gx, gy), (0, 200, 0), cv2.MARKER_CROSS, 40, 2, cv2.LINE_AA)
-    cv2.circle(bgr,    (gx, gy), 10, (0, 200, 0), 2, cv2.LINE_AA)
-    _put_text(bgr, f"GT ({gt_x:.1f}, {gt_y:.1f})", (gx + 14, gy - 14), color=(0, 200, 0))
+    cv2.circle(bgr, (gx, gy), 10, (0, 200, 0), 2, cv2.LINE_AA)
 
+    # Prediction: hollow square, empty centre (red)
     px, py = int(round(pred_x)), int(round(pred_y))
-    cv2.drawMarker(bgr, (px, py), (0, 0, 220), cv2.MARKER_CROSS, 40, 2, cv2.LINE_AA)
-    cv2.circle(bgr,    (px, py), 10, (0, 0, 220), 2, cv2.LINE_AA)
-    _put_text(bgr, f"Pred ({pred_x:.1f}, {pred_y:.1f})", (px + 14, py - 14), color=(0, 0, 220))
+    h = PRED_SQUARE_HALF
+    cv2.rectangle(bgr, (px - h, py - h), (px + h, py + h), (0, 0, 220), 2, cv2.LINE_AA)
 
+    # Connecting line
     cv2.line(bgr, (gx, gy), (px, py), (200, 200, 0), 1, cv2.LINE_AA)
-
-    for i, line in enumerate([
-        case_id,
-        f"KP error: {kp_err:.2f} px   KP AUC: {kp_auc:.4f}",
-        f"Dist error: {dist_err:.2f} px   Dist AUC: {dist_auc:.4f}",
-        f"Case final AUC: {case_auc:.4f}",
-    ]):
-        _put_text(bgr, line, (10, 28 + i * 28))
 
     return bgr
 
@@ -194,8 +189,7 @@ def run_task1(bundle_dir: Path, data_dir: Path, ingestion_dir: Path, scoring_dir
         print(f"         Case AUC:   {c_auc:.4f}")
 
         opmi_rgb = load_opmi(scenario_dir, frame_id)
-        frame = t1_draw(opmi_rgb, pred_x, pred_y, gt_x, gt_y, case_id,
-                        kp_err, dist_err, c_kp_auc, c_dist_auc, c_auc)
+        frame = t1_draw(opmi_rgb, pred_x, pred_y, gt_x, gt_y)
         cv2.imwrite(str(out_dir / f"{case_id}.png"), frame)
 
         per_case.append({
