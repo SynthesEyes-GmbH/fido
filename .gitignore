@@ -1,5 +1,6 @@
 *.zip
 !Codabench Bundle/releases/*.zip
+.vscode/
 **/__pycache__/
 **/.pytest_cache/
 *.pt
@@ -8,3 +9,5 @@
 Worker/data/*
 !Submission/Bundle/model.pth
 !Worker/data/.gitkeep
+inference/README.md
+Inference
