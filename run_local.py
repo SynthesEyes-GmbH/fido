@@ -25,7 +25,7 @@ from pathlib import Path
 # TEST_DATA_ROOT = ... # Data Path
 
 BUNDLE_ROOT = Path("D:/fido/Codabench Bundle")
-TEST_DATA_ROOT = Path("D:/FIDO Challenge/Dataset/Mock Test")
+TEST_DATA_ROOT = Path("D:/fido/Worker/data/data/comp_data/Test Data")
 TASKS = {
     "keypoints": {
         "ingestion": BUNDLE_ROOT / "ingestion_program" / "ingestion_keypoints.py",
@@ -57,6 +57,8 @@ def patch_data_paths(mod, data_dir: Path):
     data_dir = Path(data_dir)
     if hasattr(mod, "CHALLENGE_DATA_DIR"):
         mod.CHALLENGE_DATA_DIR = data_dir
+    if hasattr(mod, "REAL_TEST_SET_DIR"):
+        mod.REAL_TEST_SET_DIR = Path("D:/fido/Worker/data/data/comp_data/Test Data/Real Test Set")
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +103,14 @@ def run_task(task_name: str, submission_dir: Path, task_cfg: dict) -> dict:
         with pred_file.open() as fh:
             preds = json.load(fh)
         print(f"\n  Predictions written for {len(preds)} case(s): {sorted(preds.keys())}")
+
+        # Copy real_predictions.json to a stable location for the visualizer
+        real_pred_file = predictions_dir / "real_predictions.json"
+        if real_pred_file.exists():
+            import shutil
+            stable = BUNDLE_ROOT.parent / "last_real_predictions.json"
+            shutil.copy(real_pred_file, stable)
+            print(f"  Real predictions saved to: {stable}")
 
         # ---- Scoring ----
         print(f"\n{'='*60}")

@@ -17,11 +17,13 @@ import logging
 TASK_ID = 0
 
 CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Task 1"
+REAL_TEST_SET_DIR = Path("/app/data/comp_data/Test Data") / "Real Test Set"
 REQUIRED_FILES = {"inference.py", "model_0.pth"}
 PER_CASE_TIME_LIMIT_SECONDS = 20
 RANDOM_SEED = 2026
 NUM_EVAL_CASES = 100
 OCT_DROPOUT_RATE = 0.1
+NUM_REAL_TEST_CASES = 20
 
 
 def install_requirements(submission_dir):
@@ -163,6 +165,12 @@ def load_opmi_image(scenario_dir, frame_id):
         return np.array(image.convert("RGB"))
 
 
+def load_real_test_image(image_index):
+    image_path = REAL_TEST_SET_DIR / f"{image_index:05d}.png"
+    with Image.open(image_path) as image:
+        return np.array(image.convert("RGB"))
+
+
 def validate_point(value):
     if isinstance(value, np.ndarray):
         value = value.tolist()
@@ -193,6 +201,21 @@ def validate_prediction(prediction, test_id):
         "keypoints": validated_kps,
         "tool_tissue_distance": float(prediction["tool_tissue_distance"]),
     }
+
+
+def validate_real_prediction(prediction, test_id):
+    """Validates a prediction for a real test set case (keypoints only, no distance)."""
+    if not isinstance(prediction, dict):
+        raise ValueError(f"Real test prediction for test {test_id} must be a dictionary")
+
+    if "keypoints" not in prediction:
+        raise ValueError(f"Real test prediction for test {test_id} missing 'keypoints'")
+
+    kps = prediction["keypoints"]
+    if not isinstance(kps, list) or len(kps) != 2:
+        raise ValueError(f"keypoints for real test {test_id} must be a list of length 2")
+
+    return {"keypoints": validate_point(kps)}
 
 
 def main():
@@ -253,8 +276,29 @@ def main():
 
         total_elapsed = time.monotonic() - total_start
 
+        # ---- Real Test Set inference -------------------------------------------
+        # 10 images (00000.png - 00009.png), OCT is always None.
+        real_predictions = {}
+        if REAL_TEST_SET_DIR.is_dir():
+            logging.info(f"Running inference on {NUM_REAL_TEST_CASES} real test set images...")
+            for i in range(NUM_REAL_TEST_CASES):
+                image_path = REAL_TEST_SET_DIR / f"{i:05d}.png"
+                if not image_path.exists():
+                    logging.warning(f"Real test set image {image_path} not found, skipping.")
+                    continue
+                opmi_image = load_real_test_image(i)
+                prediction = module.inference(TASK_ID, None, opmi_image, model)
+                real_predictions[f"{i:05d}"] = validate_real_prediction(prediction, i)
+            logging.info(f"Real test set inference done: {len(real_predictions)} predictions.")
+        else:
+            logging.warning(f"Real Test Set directory not found at {REAL_TEST_SET_DIR}, skipping.")
+        # -------------------------------------------------------------------------
+
         with (output_dir / "predictions.json").open("w") as handle:
             json.dump(predictions, handle)
+
+        with (output_dir / "real_predictions.json").open("w") as handle:
+            json.dump(real_predictions, handle)
 
         with (output_dir / "durations.json").open("w") as handle:
             json.dump(

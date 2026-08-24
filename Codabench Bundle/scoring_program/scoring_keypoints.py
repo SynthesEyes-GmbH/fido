@@ -7,10 +7,13 @@ from pathlib import Path
 
 
 CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Task 1"
+REAL_TEST_SET_DIR = Path("/app/data/comp_data/Test Data") / "Real Test Set"
 MAX_THRESHOLD_PX = 10
 MAX_THRESHOLD_DIST = 20
-KEYPOINT_WEIGHT = 0.7
-DISTANCE_WEIGHT = 0.3
+MAX_THRESHOLD_REAL_PX = 20
+KEYPOINT_WEIGHT = 0.6
+DISTANCE_WEIGHT = 0.25
+REAL_WEIGHT = 0.15
 
 # Ground Truth.Task 1[2] is stored at ~7.8x the true tool-tip-to-retina pixel
 # distance on the B-scan image (e.g. stored 613.7916 -> true 78.69 px).
@@ -51,6 +54,36 @@ def load_reference(case_id):
         data = json.load(handle)
     ground_truth = data["Ground Truth"]["Task 1"]
     return ground_truth[:2], ground_truth[2] / GROUND_TRUTH_DISTANCE_SCALE
+
+
+def load_real_reference(image_index):
+    """Returns keypoint [x, y] ground truth for a real test set case.
+
+    Ground truth is stored as a single point in ddddd.txt (one line, space-separated x y)."""
+    path = REAL_TEST_SET_DIR / f"{image_index:05d}.txt"
+    with path.open() as handle:
+        parts = handle.read().strip().split()
+    return [float(parts[0]), float(parts[1])]
+
+
+
+def real_test_auc(predictions, max_threshold=MAX_THRESHOLD_REAL_PX):
+    """Computes AUC of euclidean keypoint errors over the real test set cases.
+
+    OCT is None for all real test cases; only keypoint distance is evaluated."""
+    errors = []
+    for key, pred in sorted(predictions.items()):
+        idx = int(key)
+        try:
+            ref_kp = load_real_reference(idx)
+        except Exception:
+            logging.warning(f"Could not load real test ground truth for {key}, skipping.")
+            continue
+        kp = pred["keypoints"]
+        errors.append(math.sqrt((kp[0] - ref_kp[0]) ** 2 + (kp[1] - ref_kp[1]) ** 2))
+    if not errors:
+        return 0.0
+    return auc_from_errors(errors, max_threshold)
 
 
 def load_duration(input_dir):
@@ -138,12 +171,14 @@ def write_detailed_results(output_dir, scores, ingestion_error=None):
                 'A crash during inference means no predictions were written, which scores 0.</p>'
             )
     else:
-        final_score  = scores.get("final_score", 0)
-        kp_auc       = scores.get("keypoint_auc", 0)
-        dist_auc     = scores.get("distance_auc", 0)
-        num_cases    = scores.get("num_cases", 0)
-        duration     = scores.get("duration", -1)
-        cuda         = scores.get("cuda_available", 0)
+        final_score    = scores.get("final_score", 0)
+        kp_auc         = scores.get("keypoint_auc", 0)
+        dist_auc       = scores.get("distance_auc", 0)
+        real_auc       = scores.get("real_auc", 0)
+        num_cases      = scores.get("num_cases", 0)
+        real_num_cases = scores.get("real_num_cases", 0)
+        duration       = scores.get("duration", -1)
+        cuda           = scores.get("cuda_available", 0)
 
         cuda_badge = (
             '<span style="background:#d4edda;color:#1a7f37;padding:2px 8px;border-radius:10px;font-size:0.85em;">&#9989; GPU</span>'
@@ -163,7 +198,7 @@ def write_detailed_results(output_dir, scores, ingestion_error=None):
             f'<div style="font-size:2.4em;font-weight:800;margin:4px 0;">{badge(final_score)}</div>'
             f'<div>{pct_bar(final_score)}</div>'
             '<div style="font-size:0.78em;color:#777;margin-top:6px;">'
-            f'Weighted combination: {KEYPOINT_WEIGHT}&times;Keypoint AUC + {DISTANCE_WEIGHT}&times;Distance AUC. Higher is better.</div>'
+            f'Weighted combination: {KEYPOINT_WEIGHT}&times;Keypoint AUC + {DISTANCE_WEIGHT}&times;Distance AUC + {REAL_WEIGHT}&times;Real Test AUC. Higher is better.</div>'
             '</div>'
 
             # Sub-score cards
@@ -173,14 +208,21 @@ def write_detailed_results(output_dir, scores, ingestion_error=None):
             '<div style="font-size:0.75em;color:#555;text-transform:uppercase;letter-spacing:.05em;">Keypoint AUC</div>'
             f'<div style="font-size:1.6em;font-weight:700;margin:4px 0;">{badge(kp_auc)}</div>'
             f'<div>{pct_bar(kp_auc)}</div>'
-            f'<div style="font-size:0.75em;color:#888;margin-top:4px;">Weight: {KEYPOINT_WEIGHT}</div>'
+            f'<div style="font-size:0.75em;color:#888;margin-top:4px;">Weight: {KEYPOINT_WEIGHT} &middot; Synthetic</div>'
             '</div>'
 
             '<div style="flex:1;border:1px solid #dee2e6;border-radius:8px;padding:12px 16px;">'
             '<div style="font-size:0.75em;color:#555;text-transform:uppercase;letter-spacing:.05em;">Distance AUC</div>'
             f'<div style="font-size:1.6em;font-weight:700;margin:4px 0;">{badge(dist_auc)}</div>'
             f'<div>{pct_bar(dist_auc)}</div>'
-            f'<div style="font-size:0.75em;color:#888;margin-top:4px;">Weight: {DISTANCE_WEIGHT}</div>'
+            f'<div style="font-size:0.75em;color:#888;margin-top:4px;">Weight: {DISTANCE_WEIGHT} &middot; Synthetic</div>'
+            '</div>'
+
+            '<div style="flex:1;border:1px solid #dee2e6;border-radius:8px;padding:12px 16px;">'
+            '<div style="font-size:0.75em;color:#555;text-transform:uppercase;letter-spacing:.05em;">Real Test AUC</div>'
+            f'<div style="font-size:1.6em;font-weight:700;margin:4px 0;">{badge(real_auc)}</div>'
+            f'<div>{pct_bar(real_auc)}</div>'
+            f'<div style="font-size:0.75em;color:#888;margin-top:4px;">Weight: {REAL_WEIGHT} &middot; {real_num_cases} real cases</div>'
             '</div>'
             '</div>'
 
@@ -191,11 +233,13 @@ def write_detailed_results(output_dir, scores, ingestion_error=None):
             '<th style="text-align:left;padding:8px 12px;font-size:0.8em;color:#555;border-bottom:2px solid #dee2e6;">Value</th>'
             '<th style="text-align:left;padding:8px 12px;font-size:0.8em;color:#555;border-bottom:2px solid #dee2e6;">Visualisation</th>'
             '</tr></thead><tbody>'
-            + row("Keypoint AUC",       f"{kp_auc:.6f}",   pct_bar(kp_auc))
-            + row("Distance AUC",       f"{dist_auc:.6f}",  pct_bar(dist_auc))
-            + row("Final score",        f"{final_score:.6f}", pct_bar(final_score))
-            + row("Cases evaluated",    str(num_cases))
-            + row("Inference time",     duration_str)
+            + row("Keypoint AUC (synthetic)",    f"{kp_auc:.6f}",    pct_bar(kp_auc))
+            + row("Distance AUC (synthetic)",    f"{dist_auc:.6f}",  pct_bar(dist_auc))
+            + row("Real Test AUC",               f"{real_auc:.6f}",  pct_bar(real_auc))
+            + row("Final score",                 f"{final_score:.6f}", pct_bar(final_score))
+            + row("Synthetic cases evaluated",   str(num_cases))
+            + row("Real test cases evaluated",   str(real_num_cases))
+            + row("Inference time",              duration_str)
             + f'<tr><td style="padding:8px 12px;font-weight:600;">Hardware</td>'
               f'<td style="padding:8px 12px;" colspan="2">{cuda_badge}</td></tr>'
             + '</tbody></table>'
@@ -204,11 +248,13 @@ def write_detailed_results(output_dir, scores, ingestion_error=None):
             '<details style="border:1px solid #dee2e6;border-radius:6px;padding:10px 14px;">'
             '<summary style="cursor:pointer;font-weight:600;font-size:0.9em;">How is the score computed?</summary>'
             '<p style="margin:10px 0 0;font-size:0.85em;color:#444;">'
-            '<strong>Keypoint AUC</strong>: L2 pixel distance between predicted and ground-truth tool-tip keypoint. '
+            '<strong>Keypoint AUC</strong>: L2 pixel distance between predicted and ground-truth tool-tip keypoint on synthetic data. '
             'AUC at thresholds 0&ndash;10 px. '
-            '<strong>Distance AUC</strong>: absolute error of the predicted tool-tissue distance vs ground truth (B-scan pixels). '
+            '<strong>Distance AUC</strong>: absolute error of the predicted tool-tissue distance vs ground truth (B-scan pixels) on synthetic data. '
             'AUC at thresholds 0&ndash;10 px. '
-            f'<strong>Final score</strong> = {KEYPOINT_WEIGHT}&times;Keypoint AUC + {DISTANCE_WEIGHT}&times;Distance AUC. '
+            '<strong>Real Test AUC</strong>: L2 pixel keypoint distance on real images (OCT not available). '
+            f'AUC at thresholds 0&ndash;{MAX_THRESHOLD_REAL_PX} px. '
+            f'<strong>Final score</strong> = {KEYPOINT_WEIGHT}&times;Keypoint AUC + {DISTANCE_WEIGHT}&times;Distance AUC + {REAL_WEIGHT}&times;Real Test AUC. '
             'AUC = 1.0 means all predictions are within every threshold &mdash; a perfect submission.</p>'
             '</details>'
         )
@@ -266,11 +312,27 @@ def main():
 
         keypoint_auc = auc_from_errors(keypoint_errors, MAX_THRESHOLD_PX)
         distance_auc = auc_from_errors(distance_errors, MAX_THRESHOLD_DIST)
-        final_score = KEYPOINT_WEIGHT * keypoint_auc + DISTANCE_WEIGHT * distance_auc
+
+        # Real test set scoring (keypoints only, euclidean distance AUC)
+        real_auc = 0.0
+        real_num_cases = 0
+        try:
+            real_predictions_path = find_file(input_dir, "real_predictions.json")
+            with real_predictions_path.open() as handle:
+                real_predictions = json.load(handle)
+            real_num_cases = len(real_predictions)
+            if real_num_cases > 0:
+                real_auc = real_test_auc(real_predictions, MAX_THRESHOLD_REAL_PX)
+                logging.info(f"Real test set scoring done: real_auc={real_auc} ({real_num_cases} cases)")
+
+        except FileNotFoundError:
+            logging.warning("real_predictions.json not found; real test set score = 0.0")
+
+        final_score = KEYPOINT_WEIGHT * keypoint_auc + DISTANCE_WEIGHT * distance_auc + REAL_WEIGHT * real_auc
 
         logging.info(
             f"Scoring of Task 1 is done: keypoint_auc={keypoint_auc}, "
-            f"distance_auc={distance_auc}, final_score={final_score} "
+            f"distance_auc={distance_auc}, real_auc={real_auc}, final_score={final_score} "
             f"({len(case_ids)} predictions + {len(timed_out_cases)} timed-out penalties)"
         )
 
@@ -279,8 +341,10 @@ def main():
             "task1_score": round(final_score, 6),
             "keypoint_auc": round(keypoint_auc, 6),
             "distance_auc": round(distance_auc, 6),
+            "real_auc": round(real_auc, 6),
             "duration": duration,
             "num_cases": total_cases,
+            "real_num_cases": real_num_cases,
             "timed_out": len(timed_out_cases),
             "cuda_available": int(cuda_available()),
         }
