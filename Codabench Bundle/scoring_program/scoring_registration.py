@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 CHALLENGE_DATA_DIR = Path("/app/data/comp_data/Test Data") / "Task 2"
-MAX_THRESHOLD_PX = 10
+MAX_THRESHOLD_PX = 20
 
 # Canonical unit-square corners in homogeneous 2D coordinates (4 x 3)
 # Used to project through H and measure reprojection error

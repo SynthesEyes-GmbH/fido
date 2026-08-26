@@ -96,9 +96,15 @@ def t1_draw(opmi_rgb, pred_x, pred_y, gt_x, gt_y):
 
 UNIT_CORNERS = np.array([[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], dtype=np.float64)
 
+# Full NDC [-1,1]×[-1,1] corners — used for visualising the complete iOCT FOV on the fundus.
+# The scorer uses UNIT_CORNERS for its metric, but for display we want the full field boundary.
+NDC_CORNERS = np.array([[-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]], dtype=np.float64)
 
-def _project_corners(H):
-    projected = (np.asarray(H, dtype=np.float64) @ UNIT_CORNERS.T).T
+
+def _project_corners(H, corners=None):
+    if corners is None:
+        corners = NDC_CORNERS
+    projected = (np.asarray(H, dtype=np.float64) @ corners.T).T
     w = projected[:, 2:3]
     return (projected[:, :2] / np.where(np.abs(w) < 1e-9, 1e-9, w)).astype(np.float32)
 
@@ -230,6 +236,44 @@ def run_task1(bundle_dir: Path, data_dir: Path, ingestion_dir: Path, scoring_dir
 # Task 2
 # ---------------------------------------------------------------------------
 
+def _t2_build_display(opmi_rgb: np.ndarray, H_pred: np.ndarray, H_gt: np.ndarray,
+                      case_id: str, err: float, c_auc: float,
+                      oct_volume: np.ndarray | None = None) -> np.ndarray:
+    """Build a BGR display frame with GT (green) and predicted (red) quads,
+    plus an optional en-face thumbnail on the right — mirrors task_2.py."""
+    bgr = cv2.cvtColor(opmi_rgb, cv2.COLOR_RGB2BGR)
+
+    def draw_quad(pts, color, label):
+        pts = np.asarray(pts, dtype=np.float32)
+        cv2.polylines(bgr, [pts.astype(np.int32).reshape(-1, 1, 2)],
+                      isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
+        for i, (px, py) in enumerate(pts.tolist()):
+            cv2.circle(bgr, (int(round(px)), int(round(py))), 6, color, -1, cv2.LINE_AA)
+            _put_text(bgr, f"{label}{i}", (int(round(px)) + 8, int(round(py)) - 8),
+                      scale=0.45, color=color, thickness=1)
+
+    draw_quad(_project_corners(H_gt),   (0, 200, 0),  "GT")
+    draw_quad(_project_corners(H_pred), (0, 0, 220),  "Pr")
+
+    for i, line in enumerate([
+        case_id,
+        "Green = GT   |   Red = Prediction",
+        f"Corner error: {err:.2f} px   AUC: {c_auc:.4f}",
+        "Enter/Space = next   Esc/q = quit",
+    ]):
+        _put_text(bgr, line, (10, 28 + i * 28))
+
+    # En-face thumbnail from OCT volume (slab max-projection for speed)
+    if oct_volume is not None:
+        h = bgr.shape[0]
+        ef = np.max(oct_volume, axis=1).astype(np.float32)
+        ef = ((ef - ef.min()) / (ef.max() - ef.min() + 1e-8) * 255).astype(np.uint8)
+        ef = cv2.resize(ef, (h, h), interpolation=cv2.INTER_AREA)
+        bgr = np.hstack([bgr, cv2.cvtColor(ef, cv2.COLOR_GRAY2BGR)])
+
+    return bgr
+
+
 def run_task2(bundle_dir: Path, data_dir: Path, ingestion_dir: Path, scoring_dir: Path):
     print("\n" + "=" * 60)
     print("  TASK 2 — iOCT-to-Fundus Registration")
@@ -252,33 +296,43 @@ def run_task2(bundle_dir: Path, data_dir: Path, ingestion_dir: Path, scoring_dir
     corner_errors = []
     per_case      = []
 
-    for idx, (scenario_dir, vol_id) in enumerate(cases):
-        case_id    = f"{scenario_dir.name}_{vol_id}"
-        oct_volume = ing.load_oct_volume(scenario_dir, vol_id)
-        opmi_image = ing.load_opmi_image(scenario_dir, vol_id)
+    win = "Task 2 — Registration (Live Scoring)"
 
-        pred   = module.inference(ing.TASK_ID, oct_volume, opmi_image, model)
-        H_pred = np.asarray(ing.validate_prediction(pred, idx), dtype=np.float64)
-        H_gt   = scr.load_reference(case_id)
+    try:
+        for idx, (scenario_dir, vol_id) in enumerate(cases):
+            case_id    = f"{scenario_dir.name}_{vol_id}"
+            oct_volume = ing.load_oct_volume(scenario_dir, vol_id)
+            opmi_image = ing.load_opmi_image(scenario_dir, vol_id)
 
-        ref_corners  = scr.project_corners(H_gt)
-        pred_corners = scr.project_corners(H_pred)
-        err          = scr.corner_error(pred_corners, ref_corners)
-        c_auc        = scr.auc_from_errors([err])
-        corner_errors.append(err)
+            pred   = module.inference(ing.TASK_ID, oct_volume, opmi_image, model)
+            H_pred = np.asarray(ing.validate_prediction(pred, idx), dtype=np.float64)
+            H_gt   = scr.load_reference(case_id)
 
-        print(f"  [{idx + 1:>3}/{len(cases)}] {case_id}")
-        print(f"         Corner error: {err:.2f} px   AUC: {c_auc:.4f}")
+            ref_corners  = scr.project_corners(H_gt)
+            pred_corners = scr.project_corners(H_pred)
+            err          = scr.corner_error(pred_corners, ref_corners)
+            c_auc        = scr.auc_from_errors([err])
+            corner_errors.append(err)
 
-        opmi_rgb = load_opmi(scenario_dir, vol_id)
-        frame = t2_draw(opmi_rgb, H_pred, H_gt, case_id, err, c_auc)
-        cv2.imwrite(str(out_dir / f"{case_id}.png"), frame)
+            print(f"  [{idx + 1:>3}/{len(cases)}] {case_id}")
+            print(f"         Corner error: {err:.2f} px   AUC: {c_auc:.4f}")
 
-        per_case.append({
-            "case_id":         case_id,
-            "corner_error_px": round(err, 4),
-            "case_auc":        round(c_auc, 6),
-        })
+            opmi_rgb = load_opmi(scenario_dir, vol_id)
+            frame    = _t2_build_display(opmi_rgb, H_pred, H_gt, case_id, err, c_auc, oct_volume)
+            cv2.imwrite(str(out_dir / f"{case_id}.png"), frame)
+
+            cv2.imshow(win, frame)
+            cv2.setWindowTitle(win, f"{case_id}  [{idx + 1}/{len(cases)}]  CE={err:.1f}px")
+            if cv2.waitKey(0) & 0xFF in (27, ord("q")):
+                break
+
+            per_case.append({
+                "case_id":         case_id,
+                "corner_error_px": round(err, 4),
+                "case_auc":        round(c_auc, 6),
+            })
+    finally:
+        cv2.destroyAllWindows()
 
     final_auc = scr.auc_from_errors(corner_errors)
 
